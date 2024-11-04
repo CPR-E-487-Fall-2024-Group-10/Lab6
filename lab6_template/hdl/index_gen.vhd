@@ -41,11 +41,92 @@ end index_gen;
 
 architecture Behavioral of index_gen is
 
--- TODO
+    ----------------------------------------------------------------------------
+    -- Signal Declarations
+    ----------------------------------------------------------------------------
+    signal q_filter_channel_cnt, n_filter_channel_cnt : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_filter_height_cnt,  n_filter_height_cnt  : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_filter_width_cnt,   n_filter_width_cnt   : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_output_height_cnt,  n_output_height_cnt  : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_output_width_cnt,   n_output_width_cnt   : unsigned(DIM_WIDTH-1 downto 0);
+
+    signal q_filter_addr, n_filter_addr : unsigned(DIM_WIDTH-1 downto 0);
+
+    signal w_filter_channel_ovf : std_logic;
+    signal w_filter_height_ovf  : std_logic;
+    signal w_filter_width_ovf   : std_logic;
+    signal w_output_height_ovf  : std_logic;
 
 begin
 
+    ----------------------------------------------------------------------------
+    -- Output Signal Assignments
+    ----------------------------------------------------------------------------
+    M_AXIS_TDATA_filter_addr <= std_logic_vector(q_filter_addr);
 
--- TODO
+
+    ----------------------------------------------------------------------------
+    -- Concurrent Signal Assignments
+    ----------------------------------------------------------------------------
+    -- Generate overflow signals based on counter states relative to their maximum values
+    w_filter_channel_ovf <= '1' when q_filter_channel_cnt = unsigned(filter_c) - 1 else
+                            '0';
+    w_filter_height_ovf  <= '1' when q_filter_height_cnt = unsigned(filter_h) - 1  else
+                            '0';
+    w_filter_width_ovf   <= '1' when q_filter_width_cnt = unsigned(filter_w) - 1   else
+                            '0';
+    w_output_height_ovf  <= '1' when q_output_height_cnt = unsigned(output_h) - 1  else
+                            '0';
+
+    n_filter_channel_cnt <= (others => '0') when w_filter_channel_ovf = '1' or conv_idle = '1' else -- TODO check that this is a correct interpretation of conv_idle
+                            q_filter_channel_cnt when M_AXIS_TREADY = '0' else
+                            q_filter_channel_cnt + 1;
+
+    n_filter_height_cnt  <= (others => '0')         when w_filter_height_ovf = '1' or conv_idle = '1'  else
+                            q_filter_height_cnt + 1 when w_filter_channel_ovf = '1'                    else  -- increment whenever the previous counter rolls over
+                            q_filter_height_cnt;
+
+    n_filter_width_cnt   <= (others => '0')        when w_filter_width_ovf = '1' or conv_idle = '1' else
+                            q_filter_width_cnt + 1 when w_filter_height_ovf = '1'                   else
+                            q_filter_width_cnt;
+    
+    n_output_height_cnt  <= (others => '0')         when w_output_height_ovf = '1' or conv_idle = '1' else
+                            q_output_height_cnt + 1 when w_filter_width_ovf = '1'                     else
+                            q_output_height_cnt;
+
+    n_output_width_cnt   <= (others => '0')        when conv_idle = '1'           else
+                            q_output_width_cnt + 1 when w_output_height_ovf = '1' else
+                            q_output_width_cnt;
+
+    -- Add to the address based on which counters overflow
+    n_filter_addr <= (others => '0')                                                           when w_filter_width_ovf = '1' or conv_idle = '1' else
+                     q_filter_addr                                                             when M_AXIS_TREADY = '0' else -- hold off when slave not ready to receive more data
+                     q_filter_addr + unsigned(input_end_diff_fh) + unsigned(input_end_diff_fc) when w_filter_height_ovf = '1' and w_filter_channel_ovf = '1' else
+                     q_filter_addr + unsigned(input_end_diff_fc)                               when w_filter_channel_ovf = '1' else
+                     q_filter_addr + 1;
+
+    ----------------------------------------------------------------------------
+    -- Synchronous Processes
+    ----------------------------------------------------------------------------
+    SYNC_PROC : process(rst, clk)
+    begin
+
+        if rst = '1' then
+            q_filter_channel_cnt <= (others => '0');
+            q_filter_height_cnt  <= (others => '0');
+            q_filter_width_cnt   <= (others => '0');
+            q_output_height_cnt  <= (others => '0');
+            q_output_width_cnt   <= (others => '0');
+            q_filter_addr        <= (others => '0');
+        elsif rising_edge(clk) then
+            q_filter_channel_cnt <= n_filter_channel_cnt after 1 ns;
+            q_filter_height_cnt  <= n_filter_height_cnt  after 1 ns;
+            q_filter_width_cnt   <= n_filter_width_cnt   after 1 ns;
+            q_output_height_cnt  <= n_output_height_cnt  after 1 ns;
+            q_output_width_cnt   <= n_output_width_cnt   after 1 ns;
+            q_filter_addr        <= n_filter_addr after 1 ns;
+        end if;
+
+    end process SYNC_PROC;
 
 end Behavioral;

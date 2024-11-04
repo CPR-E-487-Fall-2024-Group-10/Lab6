@@ -1,0 +1,16 @@
+#!/remote/Xilinx/2020.1/Vitis/2020.1/bin/xsct
+
+source scripts/common_args.tcl
+
+## Build application project
+
+if { ![file exists $params(workspace_dir)] } {
+  puts "Workspace does not exist at $params(workspace_dir). Did you run \`./scripts/create_vitis\`?"
+  exit 1
+}
+
+puts "Using workspace at $params(workspace_dir)"
+setws $params(workspace_dir)
+
+puts "Compiling the project"
+app build -name $params(project_name)

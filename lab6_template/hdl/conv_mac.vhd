@@ -41,5 +41,9 @@ architecture behavioral of conv_mac is
 begin
 
 -- TODO
+  S_AXIS_TREADY <= '1';
+  M_AXIS_TDATA <= (others => '0');
+  M_AXIS_TLAST <= '0';
+  M_AXIS_TVALID <= '1';
 
 end architecture behavioral;

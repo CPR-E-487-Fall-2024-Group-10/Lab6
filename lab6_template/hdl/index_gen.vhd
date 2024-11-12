@@ -44,18 +44,34 @@ architecture Behavioral of index_gen is
     ----------------------------------------------------------------------------
     -- Signal Declarations
     ----------------------------------------------------------------------------
+    -- These counts directly add to the address for the 
+    signal q_filter_channel_offset, n_filter_channel_offset : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_filter_height_offset,  n_filter_height_offset  : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_filter_width_offset,   n_filter_width_offset   : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_output_width_offset,   n_output_width_offset   : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_output_height_offset,  n_output_height_offset  : unsigned(DIM_WIDTH-1 downto 0);
+
+    -- These count the number of times a counter has been incremented
     signal q_filter_channel_cnt, n_filter_channel_cnt : unsigned(DIM_WIDTH-1 downto 0);
     signal q_filter_height_cnt,  n_filter_height_cnt  : unsigned(DIM_WIDTH-1 downto 0);
     signal q_filter_width_cnt,   n_filter_width_cnt   : unsigned(DIM_WIDTH-1 downto 0);
-    signal q_output_height_cnt,  n_output_height_cnt  : unsigned(DIM_WIDTH-1 downto 0);
     signal q_output_width_cnt,   n_output_width_cnt   : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_output_height_cnt,  n_output_height_cnt  : unsigned(DIM_WIDTH-1 downto 0);
 
-    signal q_filter_addr, n_filter_addr : unsigned(DIM_WIDTH-1 downto 0);
+    signal q_filter_addr, n_filter_addr : signed(FILTER_ADDR_WIDTH-1 downto 0);
+    signal q_input_addr,  n_input_addr  : signed(INPUT_ADDR_WIDTH-1 downto 0);
+
+    signal q_tvalid_pipeline, n_tvalid_pipeline : std_logic_vector(1 downto 0);
+
+    signal q_done, n_done : std_logic;
 
     signal w_filter_channel_ovf : std_logic;
     signal w_filter_height_ovf  : std_logic;
     signal w_filter_width_ovf   : std_logic;
     signal w_output_height_ovf  : std_logic;
+    signal w_output_width_ovf   : std_logic;
+
+    signal w_count_active       : std_logic;
 
 begin
 
@@ -63,47 +79,94 @@ begin
     -- Output Signal Assignments
     ----------------------------------------------------------------------------
     M_AXIS_TDATA_filter_addr <= std_logic_vector(q_filter_addr);
-
+    M_AXIS_TDATA_input_addr  <= std_logic_vector(q_input_addr);
+    -- M_AXIS_TVALID            <= q_tvalid_pipeline(1);
+    M_AXIS_TVALID            <= not conv_idle;
+    M_AXIS_TLAST             <= w_output_height_ovf;
 
     ----------------------------------------------------------------------------
     -- Concurrent Signal Assignments
     ----------------------------------------------------------------------------
+    -- n_tvalid_pipeline(0) <= not conv_idle;
+    -- n_tvalid_pipeline(1) <= q_tvalid_pipeline(0);
+
     -- Generate overflow signals based on counter states relative to their maximum values
-    w_filter_channel_ovf <= '1' when q_filter_channel_cnt = unsigned(filter_c) - 1 else
+    w_filter_channel_ovf <= '1' when q_filter_channel_cnt = unsigned(filter_c) - 1 and w_filter_height_ovf = '1' else
                             '0';
-    w_filter_height_ovf  <= '1' when q_filter_height_cnt = unsigned(filter_h) - 1  else
+    w_filter_height_ovf  <= '1' when q_filter_height_cnt = unsigned(filter_h) - 1 and w_filter_width_ovf = '1' else
                             '0';
-    w_filter_width_ovf   <= '1' when q_filter_width_cnt = unsigned(filter_w) - 1   else
+    w_filter_width_ovf   <= '1' when q_filter_width_cnt = unsigned(filter_w) - 1 else
                             '0';
-    w_output_height_ovf  <= '1' when q_output_height_cnt = unsigned(output_h) - 1  else
+    w_output_height_ovf  <= '1' when q_output_height_cnt = unsigned(output_h) - 1 and w_output_width_ovf = '1' else
+                            '0';
+    w_output_width_ovf   <= '1' when q_output_width_cnt = unsigned(output_w) - 1 and w_filter_channel_ovf = '1' else
                             '0';
 
-    n_filter_channel_cnt <= (others => '0') when w_filter_channel_ovf = '1' or conv_idle = '1' else -- TODO check that this is a correct interpretation of conv_idle
-                            q_filter_channel_cnt when M_AXIS_TREADY = '0' else
-                            q_filter_channel_cnt + 1;
+    w_count_active       <= (not conv_idle) and (not q_done);
 
-    n_filter_height_cnt  <= (others => '0')         when w_filter_height_ovf = '1' or conv_idle = '1'  else
-                            q_filter_height_cnt + 1 when w_filter_channel_ovf = '1'                    else  -- increment whenever the previous counter rolls over
-                            q_filter_height_cnt;
+    -- n_filter_channel_offset <= (others => '0')      when w_filter_channel_ovf = '1' or conv_idle = '1' else -- TODO check that this is a correct interpretation of conv_idle
+    --                         q_filter_channel_offset when M_AXIS_TREADY = '0' else
+    --                         q_filter_channel_offset + 1;
 
-    n_filter_width_cnt   <= (others => '0')        when w_filter_width_ovf = '1' or conv_idle = '1' else
-                            q_filter_width_cnt + 1 when w_filter_height_ovf = '1'                   else
-                            q_filter_width_cnt;
+    -- n_filter_height_offset  <= (others => '0')                                   when w_filter_height_ovf = '1' or conv_idle = '1'  else
+    --                         q_filter_height_offset + unsigned(input_end_diff_fc) when w_filter_width_ovf = '1'                    else
+    --                         q_filter_height_offset;
+
+    -- n_filter_width_offset   <= (others => '0')                                  when w_filter_width_ovf = '1' or conv_idle = '1' else
+    --                         q_filter_width_offset + unsigned(input_end_diff_fw) when w_filter_channel_ovf = '1'                   else
+    --                         q_filter_width_offset;
     
-    n_output_height_cnt  <= (others => '0')         when w_output_height_ovf = '1' or conv_idle = '1' else
-                            q_output_height_cnt + 1 when w_filter_width_ovf = '1'                     else
-                            q_output_height_cnt;
+    -- n_output_height_offset  <= (others => '0')                                   when w_output_height_ovf = '1' or conv_idle = '1' else
+    --                         q_output_height_offset + unsigned(input_end_diff_fh) when w_output_width_ovf = '1'                     else
+    --                         q_output_height_offset;
 
-    n_output_width_cnt   <= (others => '0')        when conv_idle = '1'           else
-                            q_output_width_cnt + 1 when w_output_height_ovf = '1' else
+    -- n_output_width_offset   <= (others => '0')                                  when conv_idle = '1'           else
+    --                         q_output_width_offset + unsigned(input_end_diff_ow) when w_filter_height_ovf = '1' else
+    --                         q_output_width_offset;
+
+    n_filter_channel_cnt    <= (others => '0')      when w_filter_channel_ovf = '1' or conv_idle = '1' else -- TODO check that this is a correct interpretation of conv_idle
+                            q_filter_channel_cnt + 1 when w_filter_height_ovf = '1' else
+                            q_filter_channel_cnt;
+
+    n_filter_height_cnt  <= (others => '0')      when w_filter_height_ovf = '1' or conv_idle = '1'  else
+                            q_filter_height_cnt + 1 when w_filter_width_ovf = '1'                    else  -- increment whenever the previous counter rolls over
+                            q_filter_height_cnt;
+    
+    n_filter_width_cnt   <= (others => '0')     when w_filter_width_ovf = '1' or conv_idle = '1' else
+                            q_filter_width_cnt + 1  when M_AXIS_TREADY = '1' and w_count_active = '1' else
+                            q_filter_width_cnt;
+        
+    n_output_height_cnt  <= (others => '0')      when w_output_height_ovf = '1' or conv_idle = '1' else
+                            q_output_height_cnt + 1 when w_output_width_ovf = '1'                     else
+                            q_output_height_cnt;
+    
+    n_output_width_cnt   <= (others => '0')     when w_output_width_ovf = '1' or conv_idle = '1' else
+                            q_output_width_cnt + 1 when w_filter_channel_ovf = '1' else
                             q_output_width_cnt;
 
     -- Add to the address based on which counters overflow
-    n_filter_addr <= (others => '0')                                                           when w_filter_width_ovf = '1' or conv_idle = '1' else
-                     q_filter_addr                                                             when M_AXIS_TREADY = '0' else -- hold off when slave not ready to receive more data
-                     q_filter_addr + unsigned(input_end_diff_fh) + unsigned(input_end_diff_fc) when w_filter_height_ovf = '1' and w_filter_channel_ovf = '1' else
-                     q_filter_addr + unsigned(input_end_diff_fc)                               when w_filter_channel_ovf = '1' else
-                     q_filter_addr + 1;
+    -- n_filter_addr <= resize(q_filter_width_offset + q_filter_height_offset + q_filter_channel_offset, FILTER_ADDR_WIDTH);
+
+    -- n_input_addr  <= resize(q_output_width_offset + q_output_height_offset + q_filter_width_offset + q_filter_height_offset + q_filter_channel_offset, INPUT_ADDR_WIDTH);
+
+    n_filter_addr <= (others => '0') when w_filter_channel_ovf = '1' else
+                     q_filter_addr + 1 when w_count_active = '1' else
+                     q_filter_addr;
+
+    -- q_filter_addr + resize(signed(input_end_diff_fh), FILTER_ADDR_WIDTH) when w_filter_height_ovf = '1' else
+    -- q_filter_addr + resize(signed(input_end_diff_fw), FILTER_ADDR_WIDTH) when w_filter_width_ovf = '1' else
+
+    n_input_addr <= (others => '0') when w_output_height_ovf = '1' else
+                    q_input_addr + signed(input_end_diff_ow) when w_output_width_ovf = '1' else
+                    q_input_addr + signed(input_end_diff_fc) when w_filter_channel_ovf = '1' else
+                    q_input_addr + signed(input_end_diff_fh) when w_filter_height_ovf = '1' else
+                    q_input_addr + signed(input_end_diff_fw) when w_filter_width_ovf = '1' else
+                    q_input_addr + 1 when w_count_active = '1' else
+                    q_input_addr;
+
+    n_done <= '1' when w_output_height_ovf = '1' and q_done = '0' else
+              '0' when conv_idle = '1' and q_done = '1' else
+              q_done;
 
     ----------------------------------------------------------------------------
     -- Synchronous Processes
@@ -112,19 +175,35 @@ begin
     begin
 
         if rst = '1' then
-            q_filter_channel_cnt <= (others => '0');
-            q_filter_height_cnt  <= (others => '0');
-            q_filter_width_cnt   <= (others => '0');
-            q_output_height_cnt  <= (others => '0');
-            q_output_width_cnt   <= (others => '0');
-            q_filter_addr        <= (others => '0');
+            -- q_filter_channel_offset <= (others => '0');
+            -- q_filter_height_offset  <= (others => '0');
+            -- q_filter_width_offset   <= (others => '0');
+            -- q_output_height_offset  <= (others => '0');
+            -- q_output_width_offset   <= (others => '0');
+            q_filter_channel_cnt    <= (others => '0');
+            q_filter_height_cnt     <= (others => '0');
+            q_filter_width_cnt      <= (others => '0');
+            q_output_height_cnt     <= (others => '0');
+            q_output_width_cnt      <= (others => '0');
+            q_filter_addr           <= (others => '0');
+            q_input_addr            <= (others => '0');
+            -- q_tvalid_pipeline       <= (others => '0');
+            q_done                  <= '0';
         elsif rising_edge(clk) then
-            q_filter_channel_cnt <= n_filter_channel_cnt after 1 ns;
-            q_filter_height_cnt  <= n_filter_height_cnt  after 1 ns;
-            q_filter_width_cnt   <= n_filter_width_cnt   after 1 ns;
-            q_output_height_cnt  <= n_output_height_cnt  after 1 ns;
-            q_output_width_cnt   <= n_output_width_cnt   after 1 ns;
-            q_filter_addr        <= n_filter_addr after 1 ns;
+            -- q_filter_channel_offset <= n_filter_channel_offset;
+            -- q_filter_height_offset  <= n_filter_height_offset;
+            -- q_filter_width_offset   <= n_filter_width_offset;
+            -- q_output_height_offset  <= n_output_height_offset;
+            -- q_output_width_offset   <= n_output_width_offset;
+            q_filter_channel_cnt    <= n_filter_channel_cnt;
+            q_filter_height_cnt     <= n_filter_height_cnt ;
+            q_filter_width_cnt      <= n_filter_width_cnt  ;
+            q_output_height_cnt     <= n_output_height_cnt ;
+            q_output_width_cnt      <= n_output_width_cnt  ;
+            q_filter_addr           <= n_filter_addr       ;
+            q_input_addr            <= n_input_addr        ;
+            -- q_tvalid_pipeline       <= n_tvalid_pipeline;
+            q_done                  <= n_done;
         end if;
 
     end process SYNC_PROC;

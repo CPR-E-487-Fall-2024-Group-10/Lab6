@@ -39,10 +39,105 @@ end dequantization;
 
 architecture Behavioral of dequantization is
 
--- TODO
+    ----------------------------------------------------------------------------
+    -- Constant Definitions
+    ----------------------------------------------------------------------------
+    constant C_UPPER_BITS_ZERO : signed((C_DATA_WIDTH - C_OUT_WIDTH)-1 downto 0) := (others => '0');
+    constant C_UPPER_BITS_ONE  : signed((C_DATA_WIDTH - C_OUT_WIDTH)-1 downto 0) := (others => '1');
+
+    ----------------------------------------------------------------------------
+    -- Type Declarations
+    ----------------------------------------------------------------------------
+    type t_tid_arr is array (0 to 3) of std_logic_vector(C_TID_WIDTH-1 downto 0);
+
+    ----------------------------------------------------------------------------
+    -- Signal Declarations
+    ----------------------------------------------------------------------------
+    signal q_scaled,    n_scaled    : signed(C_DATA_WIDTH-1 downto 0);
+    signal q_relued,    n_relued    : signed(C_DATA_WIDTH-1 downto 0);
+    signal q_zeroed,    n_zeroed    : signed(C_DATA_WIDTH-1 downto 0);
+    signal q_saturated, n_saturated : signed(C_OUT_WIDTH-1 downto 0);
+    signal q_tvalid,    n_tvalid    : std_logic_vector(3 downto 0); -- valid signal for each stage of pipeline
+    signal q_tlast,     n_tlast     : std_logic_vector(3 downto 0);
+    signal q_tid,       n_tid       : t_tid_arr;
+
+    signal w_slave_tready           : std_logic;
+    signal w_mult_result            : signed((2*C_DATA_WIDTH)-1 downto 0);
 
 begin
 
--- TODO
+    ----------------------------------------------------------------------------
+    -- Output Signal Assignments
+    ----------------------------------------------------------------------------
+    M_AXIS_TDATA  <= std_logic_vector(q_saturated);
+    M_AXIS_TLAST  <= q_tlast(3);
+    M_AXIS_TID    <= q_tid(3);
+    M_AXIS_TVALID <= q_tvalid(3);
+
+    S_AXIS_TREADY <= w_slave_tready;
+
+    ----------------------------------------------------------------------------
+    -- Concurrent Signal Assignments
+    ----------------------------------------------------------------------------
+    w_slave_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(3) = '1' else
+                      '1';
+
+    w_mult_result  <= signed(S_AXIS_TDATA) * signed(q_scale);
+
+    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_slave_tready = '1' else
+                q_scaled;
+
+    n_relued <= (others => '0') when w_slave_tready = '1' and relu = '1' and q_scaled(C_DATA_WIDTH-1) = '1' else
+                q_scaled        when w_slave_tready = '1' else
+                q_relued;
+
+    n_zeroed <= q_relued + resize(signed(q_zero), C_DATA_WIDTH) when w_slave_tready = '1' else
+                q_zeroed;
+
+    n_saturated <= q_zeroed(C_OUT_WIDTH-1 downto 0) when w_slave_tready = '1' and (q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH) = C_UPPER_BITS_ZERO or q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH) = C_UPPER_BITS_ONE) else
+                   (C_OUT_WIDTH-1 => '0', others => '1') when w_slave_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '0' else -- saturate positive
+                   (C_OUT_WIDTH-1 => '1', others => '0') when w_slave_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '1' else -- saturate negative
+                   q_saturated;
+
+    n_tvalid(0) <= S_AXIS_TVALID;
+    n_tlast(0)  <= S_AXIS_TLAST;
+    n_tid(0)    <= S_AXIS_TID;
+
+    GEN_AXIS_CTRL_REGS : for I in 1 to 3 generate
+        n_tvalid(I) <= q_tvalid(I-1) when w_slave_tready = '1' else
+                       q_tvalid(I);
+
+        n_tlast(I)  <= q_tlast(I-1) when w_slave_tready = '1' else
+                       q_tlast(I);
+
+        n_tid(I)    <= q_tid(I-1) when w_slave_tready = '1' else
+                       q_tid(I);
+    end generate;
+
+    ----------------------------------------------------------------------------
+    -- Synchrononous Processes
+    ----------------------------------------------------------------------------
+    SYNC_PROC : process(clk, rst)
+    begin
+
+        if rst = '1' then
+            q_scaled    <= (others => '0');
+            q_relued    <= (others => '0');
+            q_zeroed    <= (others => '0');
+            q_saturated <= (others => '0');
+            q_tvalid    <= (others => '0');
+            q_tlast     <= (others => '0');
+            q_tid       <= (others => (others => '0'));
+        elsif rising_edge(clk) then
+            q_scaled    <= n_scaled;
+            q_relued    <= n_relued;
+            q_zeroed    <= n_zeroed;
+            q_saturated <= n_saturated;
+            q_tvalid    <= n_tvalid;
+            q_tlast     <= n_tlast;
+            q_tid       <= n_tid;
+        end if;
+
+    end process SYNC_PROC;
 
 end Behavioral;

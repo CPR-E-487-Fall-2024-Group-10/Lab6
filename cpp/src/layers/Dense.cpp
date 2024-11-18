@@ -135,15 +135,6 @@ namespace ML {
 
         float input_scale = quantNumerator / input_max_diff;
 
-        float weight_max = getWeightData().get<fp32>(0);
-        for(int i = 0; i < numIfMaps * numOfMaps; i++) {
-            if(fabs(getWeightData().get<fp32>(i)) > fabs(weight_max)) {
-                weight_max = fabs(getWeightData().get<fp32>(i));
-            }
-        }
-
-        float weight_scale = quantNumerator / fabs(weight_max);
-
         int8_t zero_point = static_cast<int8_t>(-round(input_avg * input_scale));
     
         // quantize input
@@ -152,14 +143,6 @@ namespace ML {
         quantizedInputData.allocData();
         for(int i = 0; i < numIfMaps; i++) {
             quantizedInputData.get<int8_t>(i) = static_cast<int8_t>(static_cast<int16_t>(round(dataIn.get<fp32>(i) * input_scale)) + zero_point);
-        }
-
-        // quantize weights
-        LayerParams quantizedWeightParams(1, getWeightData().getParams().dims);
-        LayerData quantizedWeightData(quantizedWeightParams);
-        quantizedWeightData.allocData();
-        for(int i = 0; i < numIfMaps * numOfMaps; i++) {
-            quantizedWeightData.get<int8_t>(i) = static_cast<int8_t>(round(getWeightData().get<fp32>(i) * weight_scale));
         }
 
         // quantize biases
@@ -230,7 +213,7 @@ namespace ML {
                 int32_t weightSum = 0;
                 for(int c = 0; c < numIfMaps; c++) {
                     int32_t i = quantizedInputData.get<int8_t>((n * numIfMaps) + c);
-                    int32_t f = quantizedWeightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
+                    int32_t f = weightDataQuantized.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
 
                     result += i * f;
                     weightSum += f;

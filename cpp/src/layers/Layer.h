@@ -47,6 +47,17 @@ class LayerData {
         std::memcpy(data.get(), other.data.get(), params.byte_size());
     }
 
+    // const LayerData& operator=(const LayerData& other) {
+    //     if(isAlloced()) {
+    //         freeData();
+    //     }
+
+    //     allocData();
+    //     std::memcpy(data.get(), other.data.get(), params.byte_size());
+
+    //     return *this;
+    // }
+
     inline bool isAlloced() const { return data != nullptr; }
     inline const LayerParams& getParams() const { return params; }
 

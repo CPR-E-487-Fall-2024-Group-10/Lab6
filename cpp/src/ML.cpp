@@ -40,7 +40,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {64, 64, 3}},                                    // Input Data
         LayerParams{sizeof(fp32), {60, 60, 32}},                                   // Output Data
         LayerParams{sizeof(fp32), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
-        LayerParams{sizeof(fp32), {32}, modelPath / "conv1_biases.bin"}            // Bias
+        LayerParams{sizeof(fp32), {32}, modelPath / "conv1_biases.bin"},           // Bias
+        LayerParams{sizeof(int8_t), {5, 5, 3, 32}}
     );
 
     // --- Conv 2: L2 ---
@@ -50,7 +51,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {60, 60, 32}},
         LayerParams{sizeof(fp32), {56, 56, 32}},
         LayerParams{sizeof(fp32), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
-        LayerParams{sizeof(fp32), {32}, modelPath / "conv2_biases.bin"}
+        LayerParams{sizeof(fp32), {32}, modelPath / "conv2_biases.bin"},
+        LayerParams{sizeof(int8_t), {5, 5, 32, 32}}
     );
 
     // --- MPL 1: L3 ---
@@ -68,7 +70,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {28, 28, 32}},
         LayerParams{sizeof(fp32), {26, 26, 64}},
         LayerParams{sizeof(fp32), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
-        LayerParams{sizeof(fp32), {64}, modelPath / "conv3_biases.bin"}
+        LayerParams{sizeof(fp32), {64}, modelPath / "conv3_biases.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 32, 64}}
     );
 
     // --- Conv 4: L5 ---
@@ -78,7 +81,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {26, 26, 64}},
         LayerParams{sizeof(fp32), {24, 24, 64}},
         LayerParams{sizeof(fp32), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
-        LayerParams{sizeof(fp32), {64}, modelPath / "conv4_biases.bin"}
+        LayerParams{sizeof(fp32), {64}, modelPath / "conv4_biases.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 64}}
     );
 
     // --- MPL 2: L6 ---
@@ -96,7 +100,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {12, 12, 64}},
         LayerParams{sizeof(fp32), {10, 10, 64}},
         LayerParams{sizeof(fp32), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
-        LayerParams{sizeof(fp32), {64}, modelPath / "conv5_biases.bin"}
+        LayerParams{sizeof(fp32), {64}, modelPath / "conv5_biases.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 64}}
     );
 
     // --- Conv 6: L8 ---
@@ -106,7 +111,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {10, 10, 64}},
         LayerParams{sizeof(fp32), {8, 8, 128}},
         LayerParams{sizeof(fp32), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
-        LayerParams{sizeof(fp32), {128}, modelPath / "conv6_biases.bin"}
+        LayerParams{sizeof(fp32), {128}, modelPath / "conv6_biases.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 128}}
     );
 
     // --- MPL 3: L9 ---
@@ -133,6 +139,7 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {256}},
         LayerParams{sizeof(fp32), {2048, 256}, modelPath / "dense1_weights.bin"},
         LayerParams{sizeof(fp32), {256}, modelPath / "dense1_biases.bin"},
+        LayerParams{sizeof(int8_t), {2048, 256}},
         true
     );
 
@@ -144,6 +151,7 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(fp32), {200}},
         LayerParams{sizeof(fp32), {256, 200}, modelPath / "dense2_weights.bin"},
         LayerParams{sizeof(fp32), {200}, modelPath / "dense2_biases.bin"},
+        LayerParams{sizeof(int8_t), {256, 200}},
         false
     );
 

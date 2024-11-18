@@ -181,25 +181,6 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     }
 
     float input_scale = quantNumerator / input_max_diff;
-
-    float weight_max_abs = getWeightData().get<fp32>(0);
-    float weight_max = 0.0f;
-    float weight_min = 1.0f;
-    for(int i = 0; i < kernelWidth * kernelHeight * kernelDepth * numKernels; i++) {
-        if(fabs(getWeightData().get<fp32>(i)) > fabs(weight_max_abs)) {
-            weight_max_abs = fabs(getWeightData().get<fp32>(i));
-        }
-
-        if(getWeightData().get<fp32>(i) > weight_max) {
-            weight_max = getWeightData().get<fp32>(i);
-        }
-
-        if(getWeightData().get<fp32>(i) < weight_min) {
-            weight_min = getWeightData().get<fp32>(i);
-        }
-    }
-
-    float weight_scale = quantNumerator / fabs(weight_max_abs);
     
     int8_t zero_point = static_cast<int8_t>(-round(input_avg * input_scale));
     
@@ -210,18 +191,6 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     for(int i = 0; i < numIfMaps * inHeight * inWidth; i++) {
         quantizedInputData.get<int8_t>(i) = static_cast<int8_t>(static_cast<int16_t>(round(dataIn.get<fp32>(i) * input_scale)) + zero_point);
     }    
-
-    // quantize weights
-    LayerParams quantizedWeightParams(1, weightParam.dims);
-    LayerData quantizedWeightData(quantizedWeightParams);
-    quantizedWeightData.allocData();
-    float maxWeight = 0.0f;
-    for(int i = 0; i < kernelWidth * kernelHeight * kernelDepth * numKernels; i++) {
-        quantizedWeightData.get<int8_t>(i) = static_cast<int8_t>(round(weightData.get<fp32>(i) * weight_scale));
-        if(weightData.get<fp32>(i) > maxWeight) {
-            maxWeight = weightData.get<fp32>(i);
-        }
-    }
 
     // quantize biases
     float bias_scale = weight_scale * input_scale;
@@ -247,57 +216,7 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                 // iterate for each output feature map (channel)
                 for(int m = 0; m < numOfMaps; m++) {
                     #ifdef ZEDBOARD
-                    int32_t weightSum = 0;
-
-                    int32_t writeData = 0;
-                    uint8_t numPacked = 0;
-                    for(int s = 0; s < kernelWidth; s++) {
-                        for(int r = 0; r < kernelHeight; r++) {
-                            for(int c = 0; c < kernelDepth; c++) {
-                                writeData <<= shiftAmt;
-                                writeData |= quantizedInputData.get<int8_t>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c) & andMask;
-                                writeData <<= shiftAmt;
-                                writeData |= quantizedWeightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m) & andMask;
-
-                                numPacked++;
-
-                                if(numPacked == packAmt) {
-                                    writeData |= (quantSelect << 16);
-
-                                    Xil_Out32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_TDFD_OFFSET, writeData);
-
-                                    numPacked = 0;
-                                    writeData = 0;
-                                }
-
-                                weightSum += quantizedWeightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
-                            }
-                        }
-                    }
-
-                    // send any extra
-                    if(numPacked > 0) {
-                        writeData |= (quantSelect << 16);
-
-                        Xil_Out32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_TDFD_OFFSET, writeData);
-                    }
-
-                    // set length of transmit
-                    int32_t txLen = ((kernelWidth * kernelHeight * kernelDepth) / packAmt) * 4; // length is number of elements times 4 (since it is in bytes) divided by number per 32 bits
-                    if(numPacked != 0) txLen += 4; // handle case where not evenly divisible
-
-                    Xil_Out32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_TLF_OFFSET, txLen);
-
-                    while (Xil_In32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_RDFO_OFFSET) == 0);
-
-                    uint32_t readLen = Xil_In32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_RLF_OFFSET);
-
-                    int32_t result = (int32_t) Xil_In32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_RDFD_OFFSET);
-                    readLen -= 4;
-
-                    // shouldn't happen, MAC only ever sends a single word
-                    while(readLen > 0) int32_t junk = Xil_In32(XPAR_AXI_FIFO_0_BASEADDR + XLLF_RDFD_OFFSET);
-
+                    // TODO - implement DMA transfers
                     #else
 
                     // iterate for each pixel in the input feature map
@@ -315,11 +234,11 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                             float channelSumFloat = 0.0f;
                             for(int c = 0; c < kernelDepth; c++) {
                                 int16_t data = ((int16_t) quantizedInputData.get<int8_t>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c));
-                                int16_t weight = ((int16_t) quantizedWeightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m));
+                                int16_t weight = ((int16_t) weightDataQuantized.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m));
                                 int32_t product = data * weight;
                                 channelSum += product;
 
-                                weightSum += quantizedWeightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
+                                weightSum += weightDataQuantized.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
 
                                 channelSumFloat += dataIn.get<fp32>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c)
                                                 * getWeightData().get<fp32>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
@@ -337,11 +256,11 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
 
                     #endif
 
-                    // float activation = relu(static_cast<float>((result + quantizedBiasData.get<int32_t>(m)) - (zero_point * weightSum)) / (input_scale * weight_scale));
+                    float activation = relu(static_cast<float>((result + quantizedBiasData.get<int32_t>(m)) - (zero_point * weightSum)) / (input_scale * weight_scale));
 
-                    // getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = activation;
+                    getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = activation;
 
-                    getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = (float) (((result + quantizedBiasData.get<int32_t>(m) - (zero_point * weightSum)) * ((uint64_t) scale_inverse))) / ((float) ((long) 1 << 32));
+                    // getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = (float) (((result + quantizedBiasData.get<int32_t>(m) - (zero_point * weightSum)) * ((uint64_t) scale_inverse))) / ((float) ((long) 1 << 32));
                     // printf("%f\n", getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m));
                 }
             }

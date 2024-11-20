@@ -203,8 +203,10 @@ Model buildToyModel(const Path modelPath) {
     // Input shape: 200
     // Output shape: 200
     model.addLayer<SoftmaxLayer>(
+        LayerParams{sizeof(int8_t), {200}},
         LayerParams{sizeof(fp32), {200}},
-        LayerParams{sizeof(fp32), {200}}
+        25,
+        -10
     );
 
     return model;
@@ -770,6 +772,56 @@ void runThousandImageInferenceTest(const Model& model, const Path& basePath) {
     printf("Took %f milliseconds on average for naive\n", floatTimeMillis / numImages);
 }
 
+void runNImageTest(const Model& model, const Path& basePath, int numImages) {
+    char line[32];
+    int* classIndices = (int*) malloc(sizeof(int) * numImages);
+
+    FILE* metadata = fopen((basePath / "img_data/metadata.txt").c_str(), "r");
+    while(fgets(line, 32, metadata)) {
+        int index;
+        int classIndex;
+        if(sscanf(line, "%d,%d", &index, &classIndex) == 2) {
+            classIndices[index] = classIndex;
+        }
+        if(index >= numImages) break;
+    }
+    fclose(metadata);
+
+    int numCorrect = 0;
+
+    for(int i = 0; i < numImages; i++) {
+        char filename[32];
+        sprintf(filename, "image_%d.bin", i);
+
+        logInfo("--- Running Inference Test ---");
+        logInfo(filename);
+
+        dimVec inDims = {64, 64, 3};
+
+        LayerData img({sizeof(int8_t), inDims, basePath / "img_data_new" / filename});
+        img.loadData();
+
+        model.inference(img, Layer::InfType::ACCELERATED);
+
+        dimVec outDims = model.getOutputLayer().getOutputParams().dims;
+
+        unsigned int targetIndex = classIndices[i];
+
+        size_t maxIndex = 0;
+        for(size_t j = 0; j < outDims.at(0); j++) {
+            if(model.getOutputLayer().getOutputData().get<fp32>(j) > model.getOutputLayer().getOutputData().get<fp32>(maxIndex)) {
+                maxIndex = j;
+            }
+        }
+
+        if(targetIndex == maxIndex) numCorrect++;
+    }
+
+    printf("Of %d inferences, %d were correct (Top 1)\n", numImages, numCorrect);
+
+    free(classIndices);
+}
+
 void runTests() {
     // Base input data path (determined from current directory of where you are running the command)
     Path basePath("data");  // May need to be altered for zedboards loading from SD Cards
@@ -777,6 +829,8 @@ void runTests() {
     // Build the model and allocate the buffers
     Model model = buildToyModel(basePath / "model_new"); // pulling from new biases (weights currently unchanged)
     model.allocLayers();
+
+    runNImageTest(model, basePath, 1);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);
@@ -800,9 +854,9 @@ void runTests() {
 
     // logInfo("Past delay");
 
-    for(int i = 0; i < 3; i++) {
-        runInferenceTimeLayersQuantized(model, basePath, i);
-    }
+    // for(int i = 0; i < 3; i++) {
+    //     runInferenceTimeLayersQuantized(model, basePath, i);
+    // }
 
     // for(int i = 0; i < 3; i++) {
         // runInferenceTimeLayersCustomQuantized(model, basePath, i);

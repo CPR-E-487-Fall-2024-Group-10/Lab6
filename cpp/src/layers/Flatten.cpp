@@ -9,7 +9,7 @@ namespace ML {
         }
 
         for(int n = 0; n < dataInLen; n++) {
-            getOutputData().get<fp32>(n) = dataIn.get<fp32>(n);
+            getOutputData().get<int8_t>(n) = dataIn.get<int8_t>(n);
         }
     }
 

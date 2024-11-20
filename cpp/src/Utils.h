@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "Config.h"
-#include "layers/Layer.h"
 
 // Check for string formatting support
 // #ifdef __has_include

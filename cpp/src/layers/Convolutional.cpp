@@ -113,7 +113,7 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     finalScale /= input_scale;
     finalScale /= weight_scale;
 
-    printf("%ld\n", finalScale); // DEBUG to assert that it's not zero or some other bad value
+    // printf("%ld\n", finalScale); // DEBUG to assert that it's not zero or some other bad value
 
     // we've now quantized everything we need to, start doing math
     // iterate over batch
@@ -153,7 +153,8 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                     int64_t biased = channelSum + biasData.get<int32_t>(m);
                     // multiply to dequantize this layer and requantize for next
                     int64_t scaled = biased * finalScale;
-                    int64_t zeroed = scaled + next_zero_point;
+                    int64_t relued = (scaled > 0) ? scaled : 0;
+                    int64_t zeroed = relued + next_zero_point;
 
                     // saturate
                     if(zeroed > 127) {

@@ -59,9 +59,10 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<ConvolutionalLayer>(
         LayerParams{sizeof(int8_t), {64, 64, 3}},                                    // Input Data
         LayerParams{sizeof(int8_t), {60, 60, 32}},                                   // Output Data
-        LayerParams{sizeof(fp32), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
+        LayerParams{sizeof(int8_t), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv1_biases.bin"},           // Bias
         LayerParams{sizeof(int8_t), {5, 5, 3, 32}},
+        419,
         244, // Input scale for this layer
         201, // Input scale for next layer
         -4   // Zero point for next layer
@@ -73,9 +74,10 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<ConvolutionalLayer>(
         LayerParams{sizeof(int8_t), {60, 60, 32}},
         LayerParams{sizeof(int8_t), {56, 56, 32}},
-        LayerParams{sizeof(fp32), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
+        LayerParams{sizeof(int8_t), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv2_biases.bin"},
         LayerParams{sizeof(int8_t), {5, 5, 32, 32}},
+        260,
         201,
         122,
         -3
@@ -95,9 +97,10 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<ConvolutionalLayer>(
         LayerParams{sizeof(int8_t), {28, 28, 32}},
         LayerParams{sizeof(int8_t), {26, 26, 64}},
-        LayerParams{sizeof(fp32), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv3_biases.bin"},
         LayerParams{sizeof(int8_t), {3, 3, 32, 64}},
+        183,
         122,
         192,
         -2
@@ -109,9 +112,10 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<ConvolutionalLayer>(
         LayerParams{sizeof(int8_t), {26, 26, 64}},
         LayerParams{sizeof(int8_t), {24, 24, 64}},
-        LayerParams{sizeof(fp32), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv4_biases.bin"},
         LayerParams{sizeof(int8_t), {3, 3, 64, 64}},
+        234,
         192,
         176,
         -4
@@ -131,9 +135,10 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<ConvolutionalLayer>(
         LayerParams{sizeof(int8_t), {12, 12, 64}},
         LayerParams{sizeof(int8_t), {10, 10, 64}},
-        LayerParams{sizeof(fp32), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv5_biases.bin"},
         LayerParams{sizeof(int8_t), {3, 3, 64, 64}},
+        236,
         176,
         124,
         -6
@@ -145,9 +150,10 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<ConvolutionalLayer>(
         LayerParams{sizeof(int8_t), {10, 10, 64}},
         LayerParams{sizeof(int8_t), {8, 8, 128}},
-        LayerParams{sizeof(fp32), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
         LayerParams{sizeof(int32_t), {128}, modelPath / "conv6_biases.bin"},
         LayerParams{sizeof(int8_t), {3, 3, 64, 128}},
+        248,
         124,
         69,
         -6
@@ -175,10 +181,11 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<DenseLayer>(
         LayerParams{sizeof(int8_t), {2048}},
         LayerParams{sizeof(int8_t), {256}},
-        LayerParams{sizeof(fp32), {2048, 256}, modelPath / "dense1_weights.bin"},
+        LayerParams{sizeof(int8_t), {2048, 256}, modelPath / "dense1_weights.bin"},
         LayerParams{sizeof(int32_t), {256}, modelPath / "dense1_biases.bin"},
         LayerParams{sizeof(int8_t), {2048, 256}},
         true,
+        227,
         69,
         25,
         -10
@@ -190,10 +197,11 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<DenseLayer>(
         LayerParams{sizeof(int8_t), {256}},
         LayerParams{sizeof(int8_t), {200}},
-        LayerParams{sizeof(fp32), {256, 200}, modelPath / "dense2_weights.bin"},
+        LayerParams{sizeof(int8_t), {256, 200}, modelPath / "dense2_weights.bin"},
         LayerParams{sizeof(int32_t), {200}, modelPath / "dense2_biases.bin"},
         LayerParams{sizeof(int8_t), {256, 200}},
         false,
+        95,
         25, // just reuse same quantization, will sort out at the end before softmax
         25,
         -10

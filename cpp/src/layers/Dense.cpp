@@ -78,7 +78,7 @@ namespace ML {
                 int32_t weightSum = 0;
                 for(int c = 0; c < numIfMaps; c++) {
                     int32_t i = dataIn.get<int8_t>((n * numIfMaps) + c);
-                    int32_t f = weightDataQuantized.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
+                    int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
 
                     result += i * f;
                     weightSum += f;

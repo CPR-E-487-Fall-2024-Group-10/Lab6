@@ -137,7 +137,7 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                             for(int r = 0; r < kernelHeight; r++) {
                                 int16_t data = ((int16_t) dataIn.get<int8_t>((n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r)));
                                 // TODO need to reorder weights as well for final hardware implementation, this should work for testing
-                                int16_t weight = ((int16_t) weightDataQuantized.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m));
+                                int16_t weight = ((int16_t) weightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r));
                                 int32_t product = data * weight;
 
                                 widthSum += product;

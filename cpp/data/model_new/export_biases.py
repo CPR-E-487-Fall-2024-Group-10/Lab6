@@ -46,5 +46,7 @@ for i in range(len(unique_values)):
 print('Final Constants (' + str(len(final_constants)) + '):')
 print(final_constants)
 
+np_arr = np.array(final_constants, dtype=np.int32)
+
 out_file = open('./out.bin', 'wb')
-out_file.write(np.array(final_constants).tobytes())
+out_file.write(np_arr.tobytes())

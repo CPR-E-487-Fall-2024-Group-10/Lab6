@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Config.h"
+#include "layers/Layer.h"
 
 // Check for string formatting support
 // #ifdef __has_include
@@ -201,6 +202,7 @@ class Path : public std::string {
     }
 };
 
+// Our defined functions
 float relu(float x);
 
 int32_t relu(int32_t x, int32_t zero_point);

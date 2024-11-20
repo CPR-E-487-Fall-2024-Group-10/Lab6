@@ -7,14 +7,17 @@
 namespace ML {
 class ConvolutionalLayer : public Layer {
    public:
-    ConvolutionalLayer(const LayerParams inParams, const LayerParams outParams, const LayerParams weightParams, const LayerParams biasParams, const LayerParams weightParamsQuantized)
+    ConvolutionalLayer(const LayerParams inParams, const LayerParams outParams, const LayerParams weightParams, const LayerParams biasParams, const LayerParams weightParamsQuantized, int32_t input_scale, int32_t next_input_scale, int8_t next_zero_point)
         : Layer(inParams, outParams, LayerType::CONVOLUTIONAL),
           weightParam(weightParams),
           weightData(weightParams),
           biasParam(biasParams),
           biasData(biasParams),
           weightParamsQuantized(weightParamsQuantized),
-          weightDataQuantized(weightParamsQuantized)
+          weightDataQuantized(weightParamsQuantized),
+          input_scale(input_scale),
+          next_input_scale(next_input_scale),
+          next_zero_point(next_zero_point)
         {}
 
     // Getters
@@ -55,13 +58,13 @@ class ConvolutionalLayer : public Layer {
             }
         }
 
-        weight_scale = quantNumerator / fabs(weight_max_abs);
+        weight_scale = (int32_t) (quantNumerator / fabs(weight_max_abs));
 
         // quantize weights
         weightDataQuantized.allocData();
         float maxWeight = 0.0f;
         for(int i = 0; i < kernelWidth * kernelHeight * kernelDepth * numKernels; i++) {
-            weightDataQuantized.get<int8_t>(i) = static_cast<int8_t>(round(weightData.get<fp32>(i) * weight_scale));
+            weightDataQuantized.get<int8_t>(i) = static_cast<int8_t>(round(weightData.get<fp32>(i)) * weight_scale);
             if(weightData.get<fp32>(i) > maxWeight) {
                 maxWeight = weightData.get<fp32>(i);
             }
@@ -93,7 +96,11 @@ class ConvolutionalLayer : public Layer {
     LayerParams weightParamsQuantized;
     LayerData weightDataQuantized;
 
-    float weight_scale;
+    int32_t weight_scale;
+
+    int32_t input_scale;
+    int32_t next_input_scale;
+    int8_t next_zero_point;
 };
 
 }  // namespace ML

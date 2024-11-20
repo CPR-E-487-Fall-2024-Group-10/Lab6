@@ -9,7 +9,7 @@ namespace ML {
     class DenseLayer : public Layer {
 
         public:
-            DenseLayer(const LayerParams inParams, const LayerParams outParams, const LayerParams weightParams, const LayerParams biasParams, const LayerParams weightParamsQuantized, bool doActivation)
+            DenseLayer(const LayerParams inParams, const LayerParams outParams, const LayerParams weightParams, const LayerParams biasParams, const LayerParams weightParamsQuantized, bool doActivation, int32_t input_scale, int32_t next_input_scale, int8_t next_zero_point)
                 : Layer(inParams, outParams, LayerType::DENSE),
                 weightParam(weightParams),
                 weightData(weightParams),
@@ -17,7 +17,10 @@ namespace ML {
                 biasData(biasParams),
                 weightParamsQuantized(weightParamsQuantized),
                 weightDataQuantized(weightParamsQuantized),
-                doActivation(doActivation)
+                doActivation(doActivation),
+                input_scale(input_scale),
+                next_input_scale(next_input_scale),
+                next_zero_point(next_zero_point)
                 {}
 
             // Getters
@@ -54,12 +57,12 @@ namespace ML {
                     }
                 }
 
-                weight_scale = quantNumerator / fabs(weight_max);
+                weight_scale = (int32_t) (quantNumerator / fabs(weight_max));
 
                 // quantize weights
                 weightDataQuantized.allocData();
                 for(int i = 0; i < numIfMaps * numOfMaps; i++) {
-                    weightDataQuantized.get<int8_t>(i) = static_cast<int8_t>(round(getWeightData().get<fp32>(i) * weight_scale));
+                    weightDataQuantized.get<int8_t>(i) = static_cast<int8_t>(round(getWeightData().get<fp32>(i)) * weight_scale);
                 }
             }
 
@@ -82,7 +85,11 @@ namespace ML {
             LayerData weightDataQuantized;
             
             bool doActivation;
-            float weight_scale;
+            int32_t weight_scale;
+
+            int32_t input_scale;
+            int32_t next_input_scale;
+            int8_t next_zero_point;
     };
 
 }

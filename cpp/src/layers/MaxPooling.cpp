@@ -19,15 +19,14 @@ namespace ML {
         for(int m = 0; m < numChannels; m++) {
             for(int i = 0; i < outputHeight; i++) {
                 for(int j = 0; j < outputWidth; j++) {
-                    float max = 0.0f;
+                    int8_t max = 0;
                     for(int y = 0; y < vertPixelsPerPool; y++) {
                         for(int x = 0; x < horizPixelsPerPool; x++) {
-                            // float data = dataIn.get<fp32>((m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x);
-                            float data = dataIn.get<fp32>((i * vertPixelsPerPool * outputWidth * horizPixelsPerPool * numChannels) + (y * outputWidth * horizPixelsPerPool * numChannels) + (j * horizPixelsPerPool * numChannels) + (x * numChannels) + m);
+                            int8_t data = dataIn.get<int8_t>((m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x);
                             if(data > max) max = data;
                         }
                     }
-                    getOutputData().get<fp32>((i * outputWidth * numChannels) + (j * numChannels) + m) = max;
+                    getOutputData().get<int8_t>((m * outputHeight * outputWidth) + (i * outputWidth) + j) = max;
                 }
             }
         }

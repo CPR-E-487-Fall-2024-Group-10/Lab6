@@ -106,159 +106,69 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     int kernelDepth = getWeightParams().dims.at(2);
     int numKernels = getWeightParams().dims.at(3);
 
-    // quantization code
-    float input_max_diff = 0.0f;
-    float input_avg = 0.0f;
-    float input_min = 1.0f;
-    float input_max = 0.0f;
-    for(int i = 0; i < numIfMaps * inHeight * inWidth; i++) {
-        input_avg += dataIn.get<fp32>(i);
+    // find the scale to dequantize this layer and quantize for next
+    // this is kind of long-winded, but wanted to be sure bits weren't going to be lopped off unintentionally
+    int64_t finalScale = next_input_scale;
+    finalScale <<= 32;
+    finalScale /= input_scale;
+    finalScale /= weight_scale;
 
-        if(dataIn.get<fp32>(i) > input_max) {
-            input_max = dataIn.get<fp32>(i);
-        }
-
-        if(dataIn.get<fp32>(i) < input_min) {
-            input_min = dataIn.get<fp32>(i);
-        }
-    }
-
-    input_avg /= numIfMaps * inHeight * inWidth;
-
-    for(int i = 0; i < numIfMaps * inHeight * inWidth; i++) {
-        if(fabs(dataIn.get<fp32>(i) - input_avg) > input_max_diff) {
-            input_max_diff = fabs(dataIn.get<fp32>(i) - input_avg);
-        }
-    }
-
-    float quantNumerator; // numerator for quantization calculations
-    #ifdef ZEDBOARD
-    uint8_t shiftAmt; // how much to shift bits when writing to FIFO
-    int32_t quantSelect; // select to tell hardware what quantization to use
-    uint8_t packAmt; // how many weights and data we can pack at a time
-    uint8_t andMask;
-    #endif
-    switch(quantType) {
-        case Layer::QuantType::INT2:
-            quantNumerator = 1.0f;
-            #ifdef ZEDBOARD
-            shiftAmt = 2;
-            quantSelect = 0x80;
-            packAmt = 4;
-            andMask = 0x03;
-            #endif
-            break;
-
-        case Layer::QuantType::INT4:
-            quantNumerator = 7.0f;
-            #ifdef ZEDBOARD
-            shiftAmt = 4;
-            quantSelect = 0x40;
-            packAmt = 2;
-            andMask = 0x0F;
-            #endif
-            break;
-
-        case Layer::QuantType::INT8:
-            quantNumerator = 127.0f;
-            #ifdef ZEDBOARD
-            shiftAmt = 8;
-            quantSelect = 0x00;
-            packAmt = 1;
-            andMask = 0xFF;
-            #endif
-            break;
-
-        default: // shouldn't happen, just use 8 bit
-            quantNumerator = 127.0f;
-            #ifdef ZEDBOARD
-            shiftAmt = 8;
-            quantSelect = 0x00;
-            packAmt = 1;
-            andMask = 0xFF;
-            #endif
-            break;
-    }
-
-    float input_scale = quantNumerator / input_max_diff;
-    
-    int8_t zero_point = static_cast<int8_t>(-round(input_avg * input_scale));
-    
-    // quantize input
-    LayerParams quantizedInputParams(1, dataIn.getParams().dims);
-    LayerData quantizedInputData(quantizedInputParams);
-    quantizedInputData.allocData();
-    for(int i = 0; i < numIfMaps * inHeight * inWidth; i++) {
-        quantizedInputData.get<int8_t>(i) = static_cast<int8_t>(static_cast<int16_t>(round(dataIn.get<fp32>(i) * input_scale)) + zero_point);
-    }    
-
-    // quantize biases
-    float bias_scale = weight_scale * input_scale;
-
-    LayerParams quantizedBiasParams(sizeof(int32_t), biasParam.dims);
-    LayerData quantizedBiasData(quantizedBiasParams);
-    quantizedBiasData.allocData();
-    for(unsigned long i = 0; i < getBiasData().getParams().dims.at(0); i++) {
-        quantizedBiasData.get<int32_t>(i) = static_cast<int32_t>(round(getBiasData().get<fp32>(i) * bias_scale));
-    }
-
-    uint32_t scale_inverse = ((double) ((long) 1 << 32)) / (((double) input_scale) * ((double) weight_scale));
-    printf("%u\n", scale_inverse);
+    printf("%ld\n", finalScale); // DEBUG to assert that it's not zero or some other bad value
 
     // we've now quantized everything we need to, start doing math
     // iterate over batch
     for(int n = 0; n < 1; n++) {
-        // iterate for each pixel in the output feature map
-        // width
-        for(int q = 0; q < outWidth; q++) {
-            // height
-            for(int p = 0; p < outHeight; p++) {
-                // iterate for each output feature map (channel)
-                for(int m = 0; m < numOfMaps; m++) {
+
+        // now doing channel as most significant index
+        for(int m = 0; m < numOfMaps; m++) {
+            for(int q = 0; q < outWidth; q++) {
+                for(int p = 0; p < outHeight; p++) {
                     #ifdef ZEDBOARD
                     // TODO - implement DMA transfers
                     #else
 
                     // iterate for each pixel in the input feature map
                     // width
-                    int32_t heightSum = 0;
-                    int32_t weightSum = 0;
-                    float heightSumFloat = 0.0f;
-                    for(int s = 0; s < kernelWidth; s++) {
-                        // height
-                        int32_t widthSum = 0;
-                        float widthSumFloat = 0.0f;
-                        for(int r = 0; r < kernelHeight; r++) {
-                            // iterate for each input feature32 map (channel)
-                            int32_t channelSum = 0;
-                            float channelSumFloat = 0.0f;
-                            for(int c = 0; c < kernelDepth; c++) {
-                                int16_t data = ((int16_t) quantizedInputData.get<int8_t>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c));
+                    int32_t channelSum = 0;
+                    for(int c = 0; c < kernelDepth; c++) {
+                        int32_t heightSum = 0;
+                        for(int s = 0; s < kernelWidth; s++) {
+                            int32_t widthSum = 0;
+                            for(int r = 0; r < kernelHeight; r++) {
+                                int16_t data = ((int16_t) dataIn.get<int8_t>((n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r)));
+                                // TODO need to reorder weights as well for final hardware implementation, this should work for testing
                                 int16_t weight = ((int16_t) weightDataQuantized.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m));
                                 int32_t product = data * weight;
-                                channelSum += product;
 
-                                weightSum += weightDataQuantized.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
-
-                                channelSumFloat += dataIn.get<fp32>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c)
-                                                * getWeightData().get<fp32>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
+                                widthSum += product;
                             }
 
-                            widthSum += channelSum;
-                            widthSumFloat += channelSumFloat;
-                        } 
+                            heightSum += widthSum;
+                        }
 
-                        heightSum += widthSum;
-                        heightSumFloat += widthSumFloat;
+                        channelSum += heightSum;
                     }
 
-                    int32_t result = heightSum;
+                    // apply bias
+                    int64_t biased = channelSum + biasData.get<int32_t>(m);
+                    // multiply to dequantize this layer and requantize for next
+                    int64_t scaled = biased * finalScale;
+                    int64_t zeroed = scaled + next_zero_point;
+
+                    // saturate
+                    if(zeroed > 127) {
+                        zeroed = 127;
+                    } else if(zeroed < -128) {
+                        zeroed = -128;
+                    }
+
+                    getOutputData().get<int8_t>((n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p) = static_cast<int8_t>(zeroed);
 
                     #endif
 
-                    float activation = relu(static_cast<float>((result + quantizedBiasData.get<int32_t>(m)) - (zero_point * weightSum)) / (input_scale * weight_scale));
+                    // float activation = relu(static_cast<float>((result + quantizedBiasData.get<int32_t>(m)) - (zero_point * weightSum)) / (input_scale * weight_scale));
 
-                    getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = activation;
+                    // getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = activation;
 
                     // getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = (float) (((result + quantizedBiasData.get<int32_t>(m) - (zero_point * weightSum)) * ((uint64_t) scale_inverse))) / ((float) ((long) 1 << 32));
                     // printf("%f\n", getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m));

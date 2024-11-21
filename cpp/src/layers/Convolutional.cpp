@@ -19,59 +19,59 @@ namespace ML {
 void ConvolutionalLayer::computeNaive(const LayerData& dataIn) const {
     // TODO: Your Code Here...
     // The following line is an example of copying a single 32-bit floating point integer from the input layer data to the output layer data
-    getOutputData().get<fp32>(0) = dataIn.get<fp32>(0);
+    // getOutputData().get<fp32>(0) = dataIn.get<fp32>(0);
 
-    // number of output feature maps
-    int numOfMaps = getOutputData().getParams().dims.at(2);
-    // output height and width
-    int outHeight = getOutputData().getParams().dims.at(1);
-    int outWidth = getOutputData().getParams().dims.at(0);
-    // number of input feature maps
-    int numIfMaps = dataIn.getParams().dims.at(2);
-    // input height and width
-    int inHeight = dataIn.getParams().dims.at(1);
-    int inWidth = dataIn.getParams().dims.at(0);
+    // // number of output feature maps
+    // int numOfMaps = getOutputData().getParams().dims.at(2);
+    // // output height and width
+    // int outHeight = getOutputData().getParams().dims.at(1);
+    // int outWidth = getOutputData().getParams().dims.at(0);
+    // // number of input feature maps
+    // int numIfMaps = dataIn.getParams().dims.at(2);
+    // // input height and width
+    // int inHeight = dataIn.getParams().dims.at(1);
+    // int inWidth = dataIn.getParams().dims.at(0);
 
-    int kernelHeight = getWeightParams().dims.at(1);
-    int kernelWidth = getWeightParams().dims.at(0);
-    int kernelDepth = getWeightParams().dims.at(2);
-    int numKernels = getWeightParams().dims.at(3);
+    // int kernelHeight = getWeightParams().dims.at(1);
+    // int kernelWidth = getWeightParams().dims.at(0);
+    // int kernelDepth = getWeightParams().dims.at(2);
+    // int numKernels = getWeightParams().dims.at(3);
 
-    // TODO see if this can be removed or needs to be another value, I don't think we ever process more than one image as a batch
-    // iterate over batch
-    for(int n = 0; n < 1; n++) {
-        // iterate for each pixel in the output feature map
-        // width
-        for(int q = 0; q < outWidth; q++) {
-            // height
-            for(int p = 0; p < outHeight; p++) {
-                // iterate for each output feature map (channel)
-                for(int m = 0; m < numOfMaps; m++) {
-                    // iterate for each pixel in the input feature map
-                    // width
-                    float heightSum = 0.0f;
-                    for(int s = 0; s < kernelWidth; s++) {
-                        // height
-                        float widthSum = 0.0f;
-                        for(int r = 0; r < kernelHeight; r++) {
-                            // iterate for each input feature map (channel)
-                            float channelSum = 0.0f;
-                            for(int c = 0; c < kernelDepth; c++) {
-                                channelSum += dataIn.get<fp32>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c)
-                                                * getWeightData().get<fp32>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
-                            }
+    // // TODO see if this can be removed or needs to be another value, I don't think we ever process more than one image as a batch
+    // // iterate over batch
+    // for(int n = 0; n < 1; n++) {
+    //     // iterate for each pixel in the output feature map
+    //     // width
+    //     for(int q = 0; q < outWidth; q++) {
+    //         // height
+    //         for(int p = 0; p < outHeight; p++) {
+    //             // iterate for each output feature map (channel)
+    //             for(int m = 0; m < numOfMaps; m++) {
+    //                 // iterate for each pixel in the input feature map
+    //                 // width
+    //                 float heightSum = 0.0f;
+    //                 for(int s = 0; s < kernelWidth; s++) {
+    //                     // height
+    //                     float widthSum = 0.0f;
+    //                     for(int r = 0; r < kernelHeight; r++) {
+    //                         // iterate for each input feature map (channel)
+    //                         float channelSum = 0.0f;
+    //                         for(int c = 0; c < kernelDepth; c++) {
+    //                             channelSum += dataIn.get<fp32>((n * numIfMaps * inHeight * inWidth) + ((q + s) * inHeight * numIfMaps) + ((p + r) * numIfMaps) + c)
+    //                                             * getWeightData().get<fp32>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (s * kernelHeight * kernelDepth * numKernels) + (r * kernelDepth * numKernels) + (c * numKernels) + m);
+    //                         }
 
-                            widthSum += channelSum;
-                        }
+    //                         widthSum += channelSum;
+    //                     }
 
-                        heightSum += widthSum;
-                    }
+    //                     heightSum += widthSum;
+    //                 }
 
-                    getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = relu(heightSum + getBiasData().get<fp32>(m));
-                }
-            }
-        }
-    }
+    //                 getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = relu(heightSum + getBiasData().get<fp32>(m));
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 // Compute the convolution using threads
@@ -135,9 +135,23 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                         for(int s = 0; s < kernelWidth; s++) {
                             int32_t widthSum = 0;
                             for(int r = 0; r < kernelHeight; r++) {
-                                int16_t data = ((int16_t) dataIn.get<int8_t>((n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r)));
+                                uint32_t dataIndex = (n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r);
+                                uint32_t weightIndex = (n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r;
+
+                                if(dataIndex >= dataIn.getParams().flat_count() || dataIndex < 0) {
+                                    printf("!!! Exceeded input dimensions !!!\n");
+                                }
+
+                                if(weightIndex >= weightData.getParams().flat_count() || weightIndex < 0) {
+                                    printf("!!! Exceeded weight dimensions !!!\n");
+                                }
+
+                                int16_t data = ((int16_t) dataIn.get<int8_t>(dataIndex));
+                                int16_t weight = ((int16_t) weightData.get<int8_t>(weightIndex));
+
+                                // int16_t data = ((int16_t) dataIn.get<int8_t>((n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r)));
                                 // TODO need to reorder weights as well for final hardware implementation, this should work for testing
-                                int16_t weight = ((int16_t) weightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r));
+                                // int16_t weight = ((int16_t) weightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r));
                                 int32_t product = data * weight;
 
                                 widthSum += product;
@@ -153,7 +167,8 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                     int64_t biased = channelSum + biasData.get<int32_t>(m);
                     // multiply to dequantize this layer and requantize for next
                     int64_t scaled = biased * finalScale;
-                    int64_t relued = (scaled > 0) ? scaled : 0;
+                    int64_t shifted = (scaled >> 32);
+                    int64_t relued = (shifted > 0) ? shifted : 0;
                     int64_t zeroed = relued + next_zero_point;
 
                     // saturate
@@ -163,7 +178,15 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                         zeroed = -128;
                     }
 
-                    getOutputData().get<int8_t>((n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p) = static_cast<int8_t>(zeroed);
+                    uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p;
+
+                    if(outIndex >= getOutputData().getParams().flat_count() || outIndex < 0) {
+                        printf("!!! Exceeded output dimensions !!!\n");
+                    }
+
+                    getOutputData().get<int8_t>(outIndex) = static_cast<int8_t>(zeroed);
+
+                    // getOutputData().get<int8_t>((n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p) = static_cast<int8_t>(zeroed);
 
                     #endif
 

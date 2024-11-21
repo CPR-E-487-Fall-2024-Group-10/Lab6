@@ -22,11 +22,27 @@ namespace ML {
                     int8_t max = 0;
                     for(int y = 0; y < vertPixelsPerPool; y++) {
                         for(int x = 0; x < horizPixelsPerPool; x++) {
-                            int8_t data = dataIn.get<int8_t>((m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x);
+                            uint32_t dataIndex = (m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x;
+
+                            if(dataIndex > dataIn.getParams().flat_count() || dataIndex < 0) {
+                                printf("!!! Exceeded input dimensions !!!\n");
+                            }
+
+                            int8_t data = dataIn.get<int8_t>(dataIndex);
+                            // int8_t data = dataIn.get<int8_t>((m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x);
                             if(data > max) max = data;
                         }
                     }
-                    getOutputData().get<int8_t>((m * outputHeight * outputWidth) + (i * outputWidth) + j) = max;
+
+                    uint32_t outIndex = (m * outputHeight * outputWidth) + (i * outputWidth) + j;
+
+                    if(outIndex >= getOutputData().getParams().flat_count() || outIndex < 0) {
+                        printf("!!! Exceeded output dimensions !!!\n");
+                    }
+
+                    getOutputData().get<int8_t>(outIndex) = max;
+
+                    // getOutputData().get<int8_t>((m * outputHeight * outputWidth) + (i * outputWidth) + j) = max;
                 }
             }
         }

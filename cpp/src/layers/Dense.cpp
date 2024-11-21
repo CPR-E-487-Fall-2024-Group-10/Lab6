@@ -16,29 +16,29 @@ namespace ML {
 
     void DenseLayer::computeNaive(const LayerData& dataIn) const {
         // number of output feature maps
-        int numOfMaps = getOutputData().getParams().dims.at(0);
-        // number of input feature maps
-        int numIfMaps = dataIn.getParams().dims.at(0);
+        // int numOfMaps = getOutputData().getParams().dims.at(0);
+        // // number of input feature maps
+        // int numIfMaps = dataIn.getParams().dims.at(0);
 
-        for(int n = 0; n < 1; n++) {
-            // iterate for each output feature map (channel)
-            for(int m = 0; m < numOfMaps; m++) {
-                // iterate for each input feature map
-                float sum = 0.0f;
-                for(int c = 0; c < numIfMaps; c++) {
-                    float i = dataIn.get<fp32>((n * numIfMaps) + c);
-                    float f = getWeightData().get<fp32>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
+        // for(int n = 0; n < 1; n++) {
+        //     // iterate for each output feature map (channel)
+        //     for(int m = 0; m < numOfMaps; m++) {
+        //         // iterate for each input feature map
+        //         float sum = 0.0f;
+        //         for(int c = 0; c < numIfMaps; c++) {
+        //             float i = dataIn.get<fp32>((n * numIfMaps) + c);
+        //             float f = getWeightData().get<fp32>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
 
-                    sum += i * f;
-                }
+        //             sum += i * f;
+        //         }
 
-                if(doActivation) {
-                    getOutputData().get<fp32>((n * numOfMaps) + m) = relu(sum + getBiasData().get<fp32>(m));
-                } else {
-                    getOutputData().get<fp32>((n * numOfMaps) + m) = sum + getBiasData().get<fp32>(m);
-                    }
-            }
-        }
+        //         if(doActivation) {
+        //             getOutputData().get<fp32>((n * numOfMaps) + m) = relu(sum + getBiasData().get<fp32>(m));
+        //         } else {
+        //             getOutputData().get<fp32>((n * numOfMaps) + m) = sum + getBiasData().get<fp32>(m);
+        //             }
+        //     }
+        // }
     }
 
     void DenseLayer::computeThreaded(const LayerData& dataIn) const {
@@ -77,8 +77,19 @@ namespace ML {
                 int32_t result = 0;
                 int32_t weightSum = 0;
                 for(int c = 0; c < numIfMaps; c++) {
+                    int32_t dataIndex = (n * numIfMaps) + c;
+                    int32_t weightIndex = (n * numIfMaps * numOfMaps) + (c * numOfMaps) + m;
+
+                    if(dataIndex > numIfMaps) {
+                        printf("!!! Exceeded input dimensions !!!\n");
+                    }
+
+                    if(weightIndex > numIfMaps * numOfMaps) {
+                        printf("!!! Exceeded weight dimensions !!!\n");
+                    }
+
                     int32_t i = dataIn.get<int8_t>((n * numIfMaps) + c);
-                    int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m);
+                    int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m); // TODO investigate
 
                     result += i * f;
                     weightSum += f;
@@ -88,7 +99,8 @@ namespace ML {
                 int64_t biased = result + biasData.get<int32_t>(m);
                 // multiply to dequantize this layer and requantize for next
                 int64_t scaled = biased * finalScale;
-                int64_t relued = scaled;
+                int64_t shifted = (scaled >> 32);
+                int64_t relued = shifted;
                 if(doActivation) {
                     relued = (scaled > 0) ? scaled : 0;
                 }
@@ -101,7 +113,15 @@ namespace ML {
                     zeroed = -128;
                 }
 
-                getOutputData().get<int8_t>((n * numOfMaps) + m) = static_cast<int8_t>(zeroed);
+                uint32_t outIndex = (n * numOfMaps) + m;
+
+                if(outIndex >= getOutputData().getParams().flat_count() || outIndex < 0) {
+                    printf("!!! Exceeded output dimensions !!!\n");
+                }
+
+                getOutputData().get<int8_t>(outIndex) = static_cast<int8_t>(zeroed);
+
+                // getOutputData().get<int8_t>((n * numOfMaps) + m) = static_cast<int8_t>(zeroed);
 
                 #endif
             }

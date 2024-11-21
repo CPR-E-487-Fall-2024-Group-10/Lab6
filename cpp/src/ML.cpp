@@ -61,7 +61,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {60, 60, 32}},                                   // Output Data
         LayerParams{sizeof(int8_t), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv1_biases.bin"},           // Bias
-        LayerParams{sizeof(int8_t), {5, 5, 3, 32}},
         419,
         244, // Input scale for this layer
         201, // Input scale for next layer
@@ -76,7 +75,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {56, 56, 32}},
         LayerParams{sizeof(int8_t), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv2_biases.bin"},
-        LayerParams{sizeof(int8_t), {5, 5, 32, 32}},
         260,
         201,
         122,
@@ -99,7 +97,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {26, 26, 64}},
         LayerParams{sizeof(int8_t), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv3_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 32, 64}},
         183,
         122,
         192,
@@ -114,7 +111,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {24, 24, 64}},
         LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv4_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 64, 64}},
         234,
         192,
         176,
@@ -137,7 +133,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {10, 10, 64}},
         LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv5_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 64, 64}},
         236,
         176,
         124,
@@ -152,7 +147,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {8, 8, 128}},
         LayerParams{sizeof(int8_t), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
         LayerParams{sizeof(int32_t), {128}, modelPath / "conv6_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 64, 128}},
         248,
         124,
         69,
@@ -183,7 +177,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {256}},
         LayerParams{sizeof(int8_t), {2048, 256}, modelPath / "dense1_weights.bin"},
         LayerParams{sizeof(int32_t), {256}, modelPath / "dense1_biases.bin"},
-        LayerParams{sizeof(int8_t), {2048, 256}},
         true,
         227,
         69,
@@ -199,7 +192,6 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {200}},
         LayerParams{sizeof(int8_t), {256, 200}, modelPath / "dense2_weights.bin"},
         LayerParams{sizeof(int32_t), {200}, modelPath / "dense2_biases.bin"},
-        LayerParams{sizeof(int8_t), {256, 200}},
         false,
         95,
         25, // just reuse same quantization, will sort out at the end before softmax
@@ -823,6 +815,9 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
         }
 
         if(targetIndex == maxIndex) numCorrect++;
+
+        printf("Inference %d, expected class %d, got class %ld\n", i, targetIndex, maxIndex);
+        printf("Value for expected class was %f\n", model.getOutputLayer().getOutputData().get<fp32>(targetIndex));
     }
 
     printf("Of %d inferences, %d were correct (Top 1)\n", numImages, numCorrect);
@@ -838,7 +833,7 @@ void runTests() {
     Model model = buildToyModel(basePath / "model_new"); // pulling from new biases (weights currently unchanged)
     model.allocLayers();
 
-    runNImageTest(model, basePath, 1);
+    runNImageTest(model, basePath, 10);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);

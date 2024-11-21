@@ -781,9 +781,9 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
         int index;
         int classIndex;
         if(sscanf(line, "%d,%d", &index, &classIndex) == 2) {
+            if(index >= numImages) break;
             classIndices[index] = classIndex;
         }
-        if(index >= numImages) break;
     }
     fclose(metadata);
 

@@ -26,8 +26,22 @@ for elem in img_data:
 
 np_arr = np.array(quantized_data, dtype=np.int8)
 
+# print(np_arr)
+
+# max = -128
+# min = 127
+# for elem in np_arr:
+#     if elem > max:
+#         max = elem
+#     if elem < min:
+#         min = elem
+
+# print('Max: ' + str(max))
+# print('Min: ' + str(min))
+
 # transpose the np array to get an array that has channels as most significant
 np_arr_transposed = np.transpose(np.reshape(np_arr, (64, 64, 3)), (2, 0, 1))
+print(np_arr_transposed.shape)
 
 out_file = open(sys.argv[1], 'wb')
-out_file.write(np_arr.tobytes())
+out_file.write(np_arr_transposed.tobytes())

@@ -10,11 +10,14 @@ namespace ML {
         dataInDequantized.allocData();
 
         for(unsigned long i = 0; i < dataInDequantized.getParams().flat_count(); i++) {
-            int8_t data = dataIn.get<int8_t>(i);
-            int32_t scaled = data * scale;
-            int32_t zeroed = scaled + zero_point;
-            float dequantized = (float) zeroed;
+            int32_t data = dataIn.get<int8_t>(i);
+            data -= zero_point;
+            float dequantized = ((float) data) / ((float) scale);
+            // int32_t scaled = data * scale;
+            // int32_t zeroed = scaled + zero_point;
+            // float dequantized = zeroed;
             dataInDequantized.get<fp32>(i) = dequantized;
+            // printf("%f\n", dequantized);
             // dataInDequantized.get<fp32>(i) = (float) ((dataIn.get<int8_t>(i) * scale) + zero_point);
         }
 

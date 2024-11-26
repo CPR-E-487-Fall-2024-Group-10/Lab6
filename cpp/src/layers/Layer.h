@@ -260,18 +260,30 @@ template <typename T> float LayerData::compare(const LayerData& other) const {
     }
 
     size_t flat_count = params.flat_count();
-    float max_diff = 0;
+    // float max_diff = 0;
+    int max_diff = 0;
+    int avg_diff = 0;
+    size_t max_index = 0;
     T* data1 = (T*)data.get();
     T* data2 = (T*)other.data.get();
     // Recurse as needed into each array
     for (std::size_t i = 0; i < flat_count; i++) {
-        float curr_diff = fabsf(data1[i] - data2[i]);
+        // float curr_diff = fabsf(data1[i] - data2[i]);
+        int curr_diff = abs(data1[i] - data2[i]);
+
+        avg_diff += curr_diff;
 
         // Update our max difference if it is larger
         if (curr_diff > max_diff) {
             max_diff = curr_diff;
+            max_index = i;
         }
     }
+
+    avg_diff /= flat_count;
+
+    std::cout << "Average difference: " << avg_diff << "\n";
+    std::cout << "Max index: " << max_index << "\n";
 
     return max_diff;
 }

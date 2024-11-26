@@ -33,7 +33,7 @@ with open(sys.argv[2], 'r') as csv_file:
     reader = csv.reader(csv_file, delimiter=',')
     for row in reader:
         for elem in row[:len(biases)]:
-            unique_values.append(int(elem))
+            unique_values.append(int(float(elem) * weight_scale))
 
 print('Weight Sums:')
 print(unique_values)
@@ -48,5 +48,5 @@ print(final_constants)
 
 np_arr = np.array(final_constants, dtype=np.int32)
 
-out_file = open('./out.bin', 'wb')
+out_file = open(sys.argv[1], 'wb')
 out_file.write(np_arr.tobytes())

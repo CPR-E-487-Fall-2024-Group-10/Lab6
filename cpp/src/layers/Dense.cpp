@@ -89,7 +89,8 @@ namespace ML {
                     }
 
                     int32_t i = dataIn.get<int8_t>((n * numIfMaps) + c);
-                    int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m); // TODO investigate
+                    // int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m); // TODO investigate
+                    int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (m * numIfMaps) + c);
 
                     result += i * f;
                     weightSum += f;

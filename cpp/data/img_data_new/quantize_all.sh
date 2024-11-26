@@ -2,5 +2,6 @@
 
 for i in $(seq 0 999);
 do
-    python3 quantize_reorder.py "image_$i.bin" 244 -77
+    echo "Quantizing $i"
+    python3 quantize_reorder.py "image_$i.bin" 255 -128
 done

@@ -11,6 +11,20 @@ namespace ML {
         for(int n = 0; n < dataInLen; n++) {
             getOutputData().get<int8_t>(n) = dataIn.get<int8_t>(n);
         }
+
+        // int numChannels = dataIn.getParams().dims.at(2);
+        // int height = dataIn.getParams().dims.at(0);
+        // int width = dataIn.getParams().dims.at(1);
+
+        // int flatIndex = 0;
+        // for(int c = 0; c < numChannels; c++) {
+        //     for(int h = 0; h < height; h++) {
+        //         for(int w = 0; w < width; w++) {
+        //             getOutputData().get<int8_t>(flatIndex) = dataIn.get<int8_t>((c * height * width) + (h * width) + w);
+        //             flatIndex++;
+        //         }
+        //     }
+        // }
     }
 
     void FlattenLayer::computeThreaded(const LayerData& dataIn) const {

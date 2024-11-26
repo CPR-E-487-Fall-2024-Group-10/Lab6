@@ -40,7 +40,7 @@ Model buildToyModel(const Path modelPath) {
     // Scale was taken as the maximum scale from test images
     // Zero point was the closest zero point to 0 from test images
     // Conv 1
-    // Input scale = 244, Zero point = -77
+    // Input scale = 255, Zero point = -128
     // Conv 2
     // Input scale = 201, Zero point = -4
     // Conv 3
@@ -62,7 +62,7 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv1_biases.bin"},           // Bias
         419,
-        244, // Input scale for this layer
+        255, // Input scale for this layer
         201, // Input scale for next layer
         -4   // Zero point for next layer
     );
@@ -399,6 +399,39 @@ void runInferenceCheckLayersQuantized(const Model& model, const Path& basePath) 
 
     dimVec outDims = model.getOutputLayer().getOutputParams().dims;
     LayerData expected({sizeof(fp32), outDims, basePath / "image_0_data" / "layer_11_output.bin"});
+    expected.loadData();
+    logInfo("Details for final layer:");
+    outputs.back().compareWithinPrint<fp32>(expected);
+}
+
+// TODO see if this is needed
+void runInferenceCheckLayersIntermediateQuantized(const Model& model, const Path& basePath) {
+    logInfo("--- Running Inference Test ---");
+    logInfo("--- Checking after each layer ---");
+    dimVec inDims = {64, 64, 3};
+
+    // this code is basically copied from runInferenceTest() to set everything up
+    LayerData img({sizeof(int8_t), inDims, basePath / "image_0_quantized.bin"});
+    img.loadData();
+
+    // const LayerData* outputs[model.getNumLayers() + 1];
+    std::vector<LayerData> outputs;
+    outputs.push_back(img);
+
+    for(unsigned long i = 0; i < model.getNumLayers(); i++) {
+        outputs.push_back(model.inferenceLayer(outputs.at(i), i, Layer::InfType::ACCELERATED));
+        char layer_file_name[32];
+        sprintf(layer_file_name, "layer_%ld_output.bin", i);
+        if(!((i + 2) >= model.getNumLayers())) {
+            LayerData expected({sizeof(int8_t), outputs.at(i + 1).getParams().dims, basePath / "image_0_data_quantized" / layer_file_name});
+            expected.loadData();
+            logInfo("Details for layer:");
+            outputs.back().compareWithinPrint<int8_t>(expected);
+        }
+    }
+
+    dimVec outDims = model.getOutputLayer().getOutputParams().dims;
+    LayerData expected({sizeof(fp32), outDims, basePath / "image_0_data_quantized" / "layer_11_output.bin"});
     expected.loadData();
     logInfo("Details for final layer:");
     outputs.back().compareWithinPrint<fp32>(expected);
@@ -830,10 +863,12 @@ void runTests() {
     Path basePath("data");  // May need to be altered for zedboards loading from SD Cards
 
     // Build the model and allocate the buffers
-    Model model = buildToyModel(basePath / "model_new"); // pulling from new biases (weights currently unchanged)
+    Model model = buildToyModel(basePath / "model_new"); // pulling from new biases
     model.allocLayers();
 
-    runNImageTest(model, basePath, 10);
+    runNImageTest(model, basePath, 100);
+
+    // runInferenceCheckLayersIntermediateQuantized(model, basePath);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);

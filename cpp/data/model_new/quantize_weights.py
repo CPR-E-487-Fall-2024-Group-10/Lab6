@@ -26,7 +26,8 @@ for elem in weights:
 np_arr = np.array(quantized_data, dtype=np.int8)
 
 # transpose the np array to get an array that has channels as most significant
-np_arr_transposed = np.transpose(np.reshape(np_arr, (256, 200)), (0, 1))
+# np_arr_transposed = np.transpose(np.reshape(np_arr, (3, 3, 64, 128)), (3, 2, 0, 1))
+np_arr_transposed = np.transpose(np.reshape(np_arr, (4, 4, 128, 256)), (3, 2, 0, 1))
 
 out_file = open(sys.argv[1], 'wb')
-out_file.write(np_arr.tobytes())
+out_file.write(np_arr_transposed.tobytes())

@@ -113,7 +113,8 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     finalScale /= input_scale;
     finalScale /= weight_scale;
 
-    // printf("%ld\n", finalScale); // DEBUG to assert that it's not zero or some other bad value
+    int positiveSaturationCounter = 0;
+    int negativeSaturationCounter = 0;
 
     // we've now quantized everything we need to, start doing math
     // iterate over batch
@@ -192,8 +193,10 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
 
                     if(zeroed > 127) {
                         zeroed = 127;
+                        positiveSaturationCounter++;
                     } else if(zeroed < -128) {
                         zeroed = -128;
+                        negativeSaturationCounter++;
                     }
 
                     uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p;
@@ -218,6 +221,9 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
             }
         }
     }
+
+    std::cout << "Positive Saturations: " << positiveSaturationCounter << "\n";
+    std::cout << "Negative Saturations: " << negativeSaturationCounter << "\n";
 }
 
 }  // namespace ML

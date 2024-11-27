@@ -66,6 +66,9 @@ namespace ML {
         finalScale /= input_scale;
         finalScale /= weight_scale;
 
+        int positiveSaturationCounter = 0;
+        int negativeSaturationCounter = 0;
+
         for(int n = 0; n < 1; n++) {
             // iterate for each output feature map (channel)
             for(int m = 0; m < numOfMaps; m++) {
@@ -103,15 +106,17 @@ namespace ML {
                 int64_t shifted = (scaled >> 32);
                 int64_t relued = shifted;
                 if(doActivation) {
-                    relued = (scaled > 0) ? scaled : 0;
+                    relued = (shifted > 0) ? shifted : 0;
                 }
                 int64_t zeroed = relued + next_zero_point;
 
                 // saturate
                 if(zeroed > 127) {
                     zeroed = 127;
+                    positiveSaturationCounter++;
                 } else if(zeroed < -128) {
                     zeroed = -128;
+                    negativeSaturationCounter++;
                 }
 
                 uint32_t outIndex = (n * numOfMaps) + m;
@@ -127,6 +132,9 @@ namespace ML {
                 #endif
             }
         }    
+
+        std::cout << "Positive Saturations: " << positiveSaturationCounter << "\n";
+        std::cout << "Negative Saturations: " << negativeSaturationCounter << "\n";
     }
 
 }

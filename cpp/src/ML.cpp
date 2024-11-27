@@ -63,7 +63,7 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv1_biases.bin"},           // Bias
         419,
         255, // Input scale for this layer
-        201, // Input scale for next layer
+        100, // Input scale for next layer
         -4   // Zero point for next layer
     );
 
@@ -76,8 +76,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
         LayerParams{sizeof(int32_t), {32}, modelPath / "conv2_biases.bin"},
         260,
-        201,
-        122,
+        100,
+        50,
         -3
     );
 
@@ -98,8 +98,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv3_biases.bin"},
         183,
-        122,
-        192,
+        50,
+        80,
         -2
     );
 
@@ -112,8 +112,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv4_biases.bin"},
         234,
-        192,
-        176,
+        80,
+        90,
         -4
     );
 
@@ -134,8 +134,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
         LayerParams{sizeof(int32_t), {64}, modelPath / "conv5_biases.bin"},
         236,
-        176,
-        124,
+        90,
+        80,
         -6
     );
 
@@ -148,8 +148,8 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int8_t), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
         LayerParams{sizeof(int32_t), {128}, modelPath / "conv6_biases.bin"},
         248,
-        124,
-        69,
+        80,
+        45,
         -6
     );
 
@@ -179,7 +179,7 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int32_t), {256}, modelPath / "dense1_biases.bin"},
         true,
         227,
-        69,
+        45,
         25,
         -10
     );
@@ -195,7 +195,7 @@ Model buildToyModel(const Path modelPath) {
         false,
         95,
         25, // just reuse same quantization, will sort out at the end before softmax
-        25,
+        10,
         -10
     );
 
@@ -205,7 +205,7 @@ Model buildToyModel(const Path modelPath) {
     model.addLayer<SoftmaxLayer>(
         LayerParams{sizeof(int8_t), {200}},
         LayerParams{sizeof(fp32), {200}},
-        25,
+        10,
         -10
     );
 
@@ -866,9 +866,9 @@ void runTests() {
     Model model = buildToyModel(basePath / "model_new"); // pulling from new biases
     model.allocLayers();
 
-    runNImageTest(model, basePath, 100);
+    // runNImageTest(model, basePath, 100);
 
-    // runInferenceCheckLayersIntermediateQuantized(model, basePath);
+    runInferenceCheckLayersIntermediateQuantized(model, basePath);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);

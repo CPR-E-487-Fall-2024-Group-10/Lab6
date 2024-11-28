@@ -81,7 +81,8 @@ namespace ML {
                 int32_t weightSum = 0;
                 for(int c = 0; c < numIfMaps; c++) {
                     int32_t dataIndex = (n * numIfMaps) + c;
-                    int32_t weightIndex = (n * numIfMaps * numOfMaps) + (c * numOfMaps) + m;
+                    // int32_t weightIndex = (n * numIfMaps * numOfMaps) + (c * numOfMaps) + m;
+                    int32_t weightIndex = (n * numIfMaps * numOfMaps) + (m * numIfMaps) + c;
 
                     if(dataIndex > numIfMaps) {
                         printf("!!! Exceeded input dimensions !!!\n");
@@ -91,9 +92,9 @@ namespace ML {
                         printf("!!! Exceeded weight dimensions !!!\n");
                     }
 
-                    int32_t i = dataIn.get<int8_t>((n * numIfMaps) + c);
+                    int32_t i = dataIn.get<int8_t>(dataIndex);
                     // int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m); // TODO investigate
-                    int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (m * numIfMaps) + c);
+                    int32_t f = weightData.get<int8_t>(weightIndex);
 
                     result += i * f;
                     weightSum += f;

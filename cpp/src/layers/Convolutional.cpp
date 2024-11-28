@@ -145,8 +145,11 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                         for(int s = 0; s < kernelWidth; s++) {
                             int32_t heightSum = 0;
                             for(int r = 0; r < kernelHeight; r++) {
-                                uint32_t dataIndex = (n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r);
-                                uint32_t weightIndex = (n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r;
+                                // uint32_t dataIndex = (n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r);
+                                // uint32_t weightIndex = (n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r;
+
+                                uint32_t dataIndex = (n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((p + r) * inWidth) + (q + s);
+                                uint32_t weightIndex = (n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (r * kernelWidth) + s;
 
                                 if(dataIndex >= dataIn.getParams().flat_count() || dataIndex < 0) {
                                     printf("!!! Exceeded input dimensions !!!\n");
@@ -199,7 +202,8 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                         negativeSaturationCounter++;
                     }
 
-                    uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p;
+                    // uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p;
+                    uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (p * outWidth) + q;
 
                     if(outIndex >= getOutputData().getParams().flat_count() || outIndex < 0) {
                         printf("!!! Exceeded output dimensions !!!\n");

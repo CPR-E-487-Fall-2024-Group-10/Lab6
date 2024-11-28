@@ -15,8 +15,11 @@ with open(sys.argv[1], 'rb') as img_file:
 
 quantized_data = []
 
+print(img_data)
+
 for elem in img_data:
     quantized = int((scale * elem) + zero_point)
+    print(quantized)
     if quantized > 127:
         quantized = 127
     elif quantized < -128:

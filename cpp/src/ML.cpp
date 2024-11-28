@@ -180,7 +180,7 @@ Model buildToyModel(const Path modelPath) {
         true,
         227,
         45,
-        25,
+        15,
         -10
     );
 
@@ -194,7 +194,7 @@ Model buildToyModel(const Path modelPath) {
         LayerParams{sizeof(int32_t), {200}, modelPath / "dense2_biases.bin"},
         false,
         95,
-        25, // just reuse same quantization, will sort out at the end before softmax
+        15, // just reuse same quantization, will sort out at the end before softmax
         10,
         -10
     );
@@ -866,9 +866,9 @@ void runTests() {
     Model model = buildToyModel(basePath / "model_new"); // pulling from new biases
     model.allocLayers();
 
-    // runNImageTest(model, basePath, 100);
+    runNImageTest(model, basePath, 100);
 
-    runInferenceCheckLayersIntermediateQuantized(model, basePath);
+    // runInferenceCheckLayersIntermediateQuantized(model, basePath);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);

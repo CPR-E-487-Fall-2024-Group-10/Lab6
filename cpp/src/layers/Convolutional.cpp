@@ -113,9 +113,6 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     finalScale /= input_scale;
     finalScale /= weight_scale;
 
-    int positiveSaturationCounter = 0;
-    int negativeSaturationCounter = 0;
-
     // we've now quantized everything we need to, start doing math
     // iterate over batch
     for(int n = 0; n < 1; n++) {
@@ -128,26 +125,13 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                     // TODO - implement DMA transfers
                     #else
 
-                    
-                    // FILE* log_file;
-                    // if(m == 0 && q == 0 && p == 0) {
-                    //     log_file = fopen("lab6.csv", "w+");
-                        
-                    // } else {fprintf(log_file, "Data,Weight,Product,c,s,r,dataIndex,weightIndex\n");
-                    //     log_file = fopen("junk", "w+");
-                    // }
-
                     // iterate for each pixel in the input feature map
-                    // width
                     int32_t channelSum = 0;
                     for(int c = 0; c < kernelDepth; c++) {
                         int32_t widthSum = 0;
                         for(int s = 0; s < kernelWidth; s++) {
                             int32_t heightSum = 0;
                             for(int r = 0; r < kernelHeight; r++) {
-                                // uint32_t dataIndex = (n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r);
-                                // uint32_t weightIndex = (n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r;
-
                                 uint32_t dataIndex = (n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((p + r) * inWidth) + (q + s);
                                 uint32_t weightIndex = (n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (r * kernelWidth) + s;
 
@@ -162,14 +146,7 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                                 int16_t data = ((int16_t) dataIn.get<int8_t>(dataIndex));
                                 int16_t weight = ((int16_t) weightData.get<int8_t>(weightIndex));
 
-                                // int16_t data = ((int16_t) dataIn.get<int8_t>((n * numIfMaps * inHeight * inWidth) + (c * inHeight * inWidth) + ((q + s) * inHeight) + (p + r)));
-                                // TODO need to reorder weights as well for final hardware implementation, this should work for testing
-                                // int16_t weight = ((int16_t) weightData.get<int8_t>((n * kernelDepth * kernelHeight * kernelWidth * numKernels) + (m * kernelDepth * kernelHeight * kernelWidth) + (c * kernelHeight * kernelWidth) + (s * kernelHeight) + r));
                                 int32_t product = data * weight;
-
-                                // if(m == 0 && q == 0 && p == 0) {
-                                //     fprintf(log_file, "%d,%d,%d,%d,%d,%d,%d,%d\n", data, weight, product, c, s, r, dataIndex, weightIndex);
-                                // }
 
                                 heightSum += product;
                             }
@@ -180,10 +157,6 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                         channelSum += widthSum;
                     }
 
-                    // if(m == 0 && q == 0 && p == 0) {
-                    //     fclose(log_file);
-                    // }
-
                     // apply bias
                     int64_t biased = channelSum + biasData.get<int32_t>(m);
                     // multiply to dequantize this layer and requantize for next
@@ -193,16 +166,12 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                     int64_t zeroed = relued + next_zero_point;
 
                     // saturate
-
                     if(zeroed > 127) {
                         zeroed = 127;
-                        positiveSaturationCounter++;
                     } else if(zeroed < -128) {
                         zeroed = -128;
-                        negativeSaturationCounter++;
                     }
 
-                    // uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p;
                     uint32_t outIndex = (n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (p * outWidth) + q;
 
                     if(outIndex >= getOutputData().getParams().flat_count() || outIndex < 0) {
@@ -211,23 +180,11 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
 
                     getOutputData().get<int8_t>(outIndex) = static_cast<int8_t>(zeroed);
 
-                    // getOutputData().get<int8_t>((n * numOfMaps * outHeight * outWidth) + (m * outHeight * outWidth) + (q * outHeight) + p) = static_cast<int8_t>(zeroed);
-
                     #endif
-
-                    // float activation = relu(static_cast<float>((result + quantizedBiasData.get<int32_t>(m)) - (zero_point * weightSum)) / (input_scale * weight_scale));
-
-                    // getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = activation;
-
-                    // getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m) = (float) (((result + quantizedBiasData.get<int32_t>(m) - (zero_point * weightSum)) * ((uint64_t) scale_inverse))) / ((float) ((long) 1 << 32));
-                    // printf("%f\n", getOutputData().get<fp32>((n * numOfMaps * outHeight * outWidth) + (q * outHeight * numOfMaps) + (p * numOfMaps) + m));
                 }
             }
         }
     }
-
-    std::cout << "Positive Saturations: " << positiveSaturationCounter << "\n";
-    std::cout << "Negative Saturations: " << negativeSaturationCounter << "\n";
 }
 
 }  // namespace ML

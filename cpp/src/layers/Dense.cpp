@@ -66,9 +66,6 @@ namespace ML {
         finalScale /= input_scale;
         finalScale /= weight_scale;
 
-        int positiveSaturationCounter = 0;
-        int negativeSaturationCounter = 0;
-
         for(int n = 0; n < 1; n++) {
             // iterate for each output feature map (channel)
             for(int m = 0; m < numOfMaps; m++) {
@@ -81,7 +78,6 @@ namespace ML {
                 int32_t weightSum = 0;
                 for(int c = 0; c < numIfMaps; c++) {
                     int32_t dataIndex = (n * numIfMaps) + c;
-                    // int32_t weightIndex = (n * numIfMaps * numOfMaps) + (c * numOfMaps) + m;
                     int32_t weightIndex = (n * numIfMaps * numOfMaps) + (m * numIfMaps) + c;
 
                     if(dataIndex > numIfMaps) {
@@ -93,7 +89,6 @@ namespace ML {
                     }
 
                     int32_t i = dataIn.get<int8_t>(dataIndex);
-                    // int32_t f = weightData.get<int8_t>((n * numIfMaps * numOfMaps) + (c * numOfMaps) + m); // TODO investigate
                     int32_t f = weightData.get<int8_t>(weightIndex);
 
                     result += i * f;
@@ -114,10 +109,8 @@ namespace ML {
                 // saturate
                 if(zeroed > 127) {
                     zeroed = 127;
-                    positiveSaturationCounter++;
                 } else if(zeroed < -128) {
                     zeroed = -128;
-                    negativeSaturationCounter++;
                 }
 
                 uint32_t outIndex = (n * numOfMaps) + m;
@@ -128,14 +121,9 @@ namespace ML {
 
                 getOutputData().get<int8_t>(outIndex) = static_cast<int8_t>(zeroed);
 
-                // getOutputData().get<int8_t>((n * numOfMaps) + m) = static_cast<int8_t>(zeroed);
-
                 #endif
             }
-        }    
-
-        std::cout << "Positive Saturations: " << positiveSaturationCounter << "\n";
-        std::cout << "Negative Saturations: " << negativeSaturationCounter << "\n";
+        }
     }
 
 }

@@ -19,15 +19,32 @@ namespace ML {
         for(int m = 0; m < numChannels; m++) {
             for(int i = 0; i < outputHeight; i++) {
                 for(int j = 0; j < outputWidth; j++) {
-                    float max = 0.0f;
+                    int8_t max = -128;
                     for(int y = 0; y < vertPixelsPerPool; y++) {
                         for(int x = 0; x < horizPixelsPerPool; x++) {
-                            // float data = dataIn.get<fp32>((m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x);
-                            float data = dataIn.get<fp32>((i * vertPixelsPerPool * outputWidth * horizPixelsPerPool * numChannels) + (y * outputWidth * horizPixelsPerPool * numChannels) + (j * horizPixelsPerPool * numChannels) + (x * numChannels) + m);
+                            uint32_t dataIndex = (m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x;
+                            // uint32_t dataIndex = (m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool * outputHeight * vertPixelsPerPool) + (x * outputHeight * vertPixelsPerPool) + (i * vertPixelsPerPool) + y;
+
+                            if(dataIndex > dataIn.getParams().flat_count() || dataIndex < 0) {
+                                printf("!!! Exceeded input dimensions !!!\n");
+                            }
+
+                            int8_t data = dataIn.get<int8_t>(dataIndex);
+                            // int8_t data = dataIn.get<int8_t>((m * outputHeight * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (i * vertPixelsPerPool * outputWidth * horizPixelsPerPool) + (y * outputWidth * horizPixelsPerPool) + (j * horizPixelsPerPool) + x);
                             if(data > max) max = data;
                         }
                     }
-                    getOutputData().get<fp32>((i * outputWidth * numChannels) + (j * numChannels) + m) = max;
+
+                    uint32_t outIndex = (m * outputHeight * outputWidth) + (i * outputWidth) + j;
+                    // uint32_t outIndex = (m * outputHeight * outputWidth) + (j * outputHeight) + i;
+
+                    if(outIndex >= getOutputData().getParams().flat_count() || outIndex < 0) {
+                        printf("!!! Exceeded output dimensions !!!\n");
+                    }
+
+                    getOutputData().get<int8_t>(outIndex) = max;
+
+                    // getOutputData().get<int8_t>((m * outputHeight * outputWidth) + (i * outputWidth) + j) = max;
                 }
             }
         }

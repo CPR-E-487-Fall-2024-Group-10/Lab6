@@ -201,6 +201,7 @@ class Path : public std::string {
     }
 };
 
+// Our defined functions
 float relu(float x);
 
 int32_t relu(int32_t x, int32_t zero_point);

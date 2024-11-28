@@ -36,131 +36,177 @@ Model buildToyModel(const Path modelPath) {
     // LayerParams conv1_biasParam(sizeof(fp32), {32}, modelPath / "conv1_biases.bin");
     // auto conv1 = new ConvolutionalLayer(conv1_inDataParam, conv1_outDataParam, conv1_weightParam, conv1_biasParam);
 
+    // Summary of input scales and zero points for various layers
+    // Scale was taken as the maximum scale from test images
+    // Zero point was the closest zero point to 0 from test images
+    // Conv 1
+    // Input scale = 255, Zero point = -128
+    // Conv 2
+    // Input scale = 201, Zero point = -4
+    // Conv 3
+    // Input scale = 122, Zero point = -3
+    // Conv 4
+    // Input scale = 192, Zero point = -2
+    // Conv 5
+    // Input scale = 176, Zero point = -4
+    // Conv 6
+    // Input scale = 124, Zero point = -6
+    // Dense 1
+    // Input scale = 69, Zero point = -6
+    // Dense 2
+    // Input scale = 25, Zero point = -10
+
     model.addLayer<ConvolutionalLayer>(
-        LayerParams{sizeof(fp32), {64, 64, 3}},                                    // Input Data
-        LayerParams{sizeof(fp32), {60, 60, 32}},                                   // Output Data
-        LayerParams{sizeof(fp32), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
-        LayerParams{sizeof(fp32), {32}, modelPath / "conv1_biases.bin"},           // Bias
-        LayerParams{sizeof(int8_t), {5, 5, 3, 32}}
+        LayerParams{sizeof(int8_t), {64, 64, 3}},                                    // Input Data
+        LayerParams{sizeof(int8_t), {60, 60, 32}},                                   // Output Data
+        LayerParams{sizeof(int8_t), {5, 5, 3, 32}, modelPath / "conv1_weights.bin"}, // Weights
+        LayerParams{sizeof(int32_t), {32}, modelPath / "conv1_biases.bin"},           // Bias
+        419,
+        255, // Input scale for this layer
+        100, // Input scale for next layer
+        -4   // Zero point for next layer
     );
 
     // --- Conv 2: L2 ---
     // Input shape: 60x60x32
     // Output shape: 56x56x32
     model.addLayer<ConvolutionalLayer>(
-        LayerParams{sizeof(fp32), {60, 60, 32}},
-        LayerParams{sizeof(fp32), {56, 56, 32}},
-        LayerParams{sizeof(fp32), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
-        LayerParams{sizeof(fp32), {32}, modelPath / "conv2_biases.bin"},
-        LayerParams{sizeof(int8_t), {5, 5, 32, 32}}
+        LayerParams{sizeof(int8_t), {60, 60, 32}},
+        LayerParams{sizeof(int8_t), {56, 56, 32}},
+        LayerParams{sizeof(int8_t), {5, 5, 32, 32}, modelPath / "conv2_weights.bin"},
+        LayerParams{sizeof(int32_t), {32}, modelPath / "conv2_biases.bin"},
+        260,
+        100,
+        50,
+        -3
     );
 
     // --- MPL 1: L3 ---
     // Input shape: 56x56x32
     // Output shape: 28x28x32
     model.addLayer<MaxPoolingLayer>(
-        LayerParams{sizeof(fp32), {56, 56, 32}},
-        LayerParams{sizeof(fp32), {28, 28, 32}}
+        LayerParams{sizeof(int8_t), {56, 56, 32}},
+        LayerParams{sizeof(int8_t), {28, 28, 32}}
     );
 
     // --- Conv 3: L4 ---
     // Input shape: 28x28x32
     // Output shape: 26x26x64
     model.addLayer<ConvolutionalLayer>(
-        LayerParams{sizeof(fp32), {28, 28, 32}},
-        LayerParams{sizeof(fp32), {26, 26, 64}},
-        LayerParams{sizeof(fp32), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
-        LayerParams{sizeof(fp32), {64}, modelPath / "conv3_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 32, 64}}
+        LayerParams{sizeof(int8_t), {28, 28, 32}},
+        LayerParams{sizeof(int8_t), {26, 26, 64}},
+        LayerParams{sizeof(int8_t), {3, 3, 32, 64}, modelPath / "conv3_weights.bin"},
+        LayerParams{sizeof(int32_t), {64}, modelPath / "conv3_biases.bin"},
+        183,
+        50,
+        80,
+        -2
     );
 
     // --- Conv 4: L5 ---
     // Input shape: 26x26x64
     // Output shape: 24x24x64
     model.addLayer<ConvolutionalLayer>(
-        LayerParams{sizeof(fp32), {26, 26, 64}},
-        LayerParams{sizeof(fp32), {24, 24, 64}},
-        LayerParams{sizeof(fp32), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
-        LayerParams{sizeof(fp32), {64}, modelPath / "conv4_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 64, 64}}
+        LayerParams{sizeof(int8_t), {26, 26, 64}},
+        LayerParams{sizeof(int8_t), {24, 24, 64}},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv4_weights.bin"},
+        LayerParams{sizeof(int32_t), {64}, modelPath / "conv4_biases.bin"},
+        234,
+        80,
+        90,
+        -4
     );
 
     // --- MPL 2: L6 ---
     // Input shape: 24x24x64
     // Output shape: 12x12x64
     model.addLayer<MaxPoolingLayer>(
-        LayerParams{sizeof(fp32), {24, 24, 64}},
-        LayerParams{sizeof(fp32), {12, 12, 64}}
+        LayerParams{sizeof(int8_t), {24, 24, 64}},
+        LayerParams{sizeof(int8_t), {12, 12, 64}}
     );
 
     // --- Conv 5: L7 ---
     // Input shape: 12x12x64
     // Output shape: 10x10x64
     model.addLayer<ConvolutionalLayer>(
-        LayerParams{sizeof(fp32), {12, 12, 64}},
-        LayerParams{sizeof(fp32), {10, 10, 64}},
-        LayerParams{sizeof(fp32), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
-        LayerParams{sizeof(fp32), {64}, modelPath / "conv5_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 64, 64}}
+        LayerParams{sizeof(int8_t), {12, 12, 64}},
+        LayerParams{sizeof(int8_t), {10, 10, 64}},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 64}, modelPath / "conv5_weights.bin"},
+        LayerParams{sizeof(int32_t), {64}, modelPath / "conv5_biases.bin"},
+        236,
+        90,
+        80,
+        -6
     );
 
     // --- Conv 6: L8 ---
     // Input shape: 10x10x64
     // Output shape: 8x8x128
     model.addLayer<ConvolutionalLayer>(
-        LayerParams{sizeof(fp32), {10, 10, 64}},
-        LayerParams{sizeof(fp32), {8, 8, 128}},
-        LayerParams{sizeof(fp32), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
-        LayerParams{sizeof(fp32), {128}, modelPath / "conv6_biases.bin"},
-        LayerParams{sizeof(int8_t), {3, 3, 64, 128}}
+        LayerParams{sizeof(int8_t), {10, 10, 64}},
+        LayerParams{sizeof(int8_t), {8, 8, 128}},
+        LayerParams{sizeof(int8_t), {3, 3, 64, 128}, modelPath / "conv6_weights.bin"},
+        LayerParams{sizeof(int32_t), {128}, modelPath / "conv6_biases.bin"},
+        248,
+        80,
+        45,
+        -6
     );
 
     // --- MPL 3: L9 ---
     // Input shape: 8x8x128
     // Output shape: 4x4x128
     model.addLayer<MaxPoolingLayer>(
-        LayerParams{sizeof(fp32), {8, 8, 128}},
-        LayerParams{sizeof(fp32), {4, 4, 128}}
+        LayerParams{sizeof(int8_t), {8, 8, 128}},
+        LayerParams{sizeof(int8_t), {4, 4, 128}}
     );
 
     // --- Flatten 1: L10 ---
     // Input shape: 4x4x128
     // Output shape: 2048
     model.addLayer<FlattenLayer>(
-        LayerParams{sizeof(fp32), {4, 4, 128}},
-        LayerParams{sizeof(fp32), {2048}}
+        LayerParams{sizeof(int8_t), {4, 4, 128}},
+        LayerParams{sizeof(int8_t), {2048}}
     );
 
     // --- Dense 1: L11 ---
     // Input shape: 2048
     // Output shape: 256
     model.addLayer<DenseLayer>(
-        LayerParams{sizeof(fp32), {2048}},
-        LayerParams{sizeof(fp32), {256}},
-        LayerParams{sizeof(fp32), {2048, 256}, modelPath / "dense1_weights.bin"},
-        LayerParams{sizeof(fp32), {256}, modelPath / "dense1_biases.bin"},
-        LayerParams{sizeof(int8_t), {2048, 256}},
-        true
+        LayerParams{sizeof(int8_t), {2048}},
+        LayerParams{sizeof(int8_t), {256}},
+        LayerParams{sizeof(int8_t), {2048, 256}, modelPath / "dense1_weights.bin"},
+        LayerParams{sizeof(int32_t), {256}, modelPath / "dense1_biases.bin"},
+        true,
+        227,
+        45,
+        15,
+        -10
     );
 
     // --- Dense 2: L12 ---
     // Input shape: 256
     // Output shape: 200
     model.addLayer<DenseLayer>(
-        LayerParams{sizeof(fp32), {256}},
-        LayerParams{sizeof(fp32), {200}},
-        LayerParams{sizeof(fp32), {256, 200}, modelPath / "dense2_weights.bin"},
-        LayerParams{sizeof(fp32), {200}, modelPath / "dense2_biases.bin"},
-        LayerParams{sizeof(int8_t), {256, 200}},
-        false
+        LayerParams{sizeof(int8_t), {256}},
+        LayerParams{sizeof(int8_t), {200}},
+        LayerParams{sizeof(int8_t), {256, 200}, modelPath / "dense2_weights.bin"},
+        LayerParams{sizeof(int32_t), {200}, modelPath / "dense2_biases.bin"},
+        false,
+        95,
+        15, // just reuse same quantization, will sort out at the end before softmax
+        10,
+        -10
     );
 
     // --- Softmax 1: L13 ---
     // Input shape: 200
     // Output shape: 200
     model.addLayer<SoftmaxLayer>(
+        LayerParams{sizeof(int8_t), {200}},
         LayerParams{sizeof(fp32), {200}},
-        LayerParams{sizeof(fp32), {200}}
+        10,
+        -10
     );
 
     return model;
@@ -353,6 +399,39 @@ void runInferenceCheckLayersQuantized(const Model& model, const Path& basePath) 
 
     dimVec outDims = model.getOutputLayer().getOutputParams().dims;
     LayerData expected({sizeof(fp32), outDims, basePath / "image_0_data" / "layer_11_output.bin"});
+    expected.loadData();
+    logInfo("Details for final layer:");
+    outputs.back().compareWithinPrint<fp32>(expected);
+}
+
+// TODO see if this is needed
+void runInferenceCheckLayersIntermediateQuantized(const Model& model, const Path& basePath) {
+    logInfo("--- Running Inference Test ---");
+    logInfo("--- Checking after each layer ---");
+    dimVec inDims = {64, 64, 3};
+
+    // this code is basically copied from runInferenceTest() to set everything up
+    LayerData img({sizeof(int8_t), inDims, basePath / "image_0_quantized.bin"});
+    img.loadData();
+
+    // const LayerData* outputs[model.getNumLayers() + 1];
+    std::vector<LayerData> outputs;
+    outputs.push_back(img);
+
+    for(unsigned long i = 0; i < model.getNumLayers(); i++) {
+        outputs.push_back(model.inferenceLayer(outputs.at(i), i, Layer::InfType::ACCELERATED));
+        char layer_file_name[32];
+        sprintf(layer_file_name, "layer_%ld_output.bin", i);
+        if(!((i + 2) >= model.getNumLayers())) {
+            LayerData expected({sizeof(int8_t), outputs.at(i + 1).getParams().dims, basePath / "image_0_data_quantized" / layer_file_name});
+            expected.loadData();
+            logInfo("Details for layer:");
+            outputs.back().compareWithinPrint<int8_t>(expected);
+        }
+    }
+
+    dimVec outDims = model.getOutputLayer().getOutputParams().dims;
+    LayerData expected({sizeof(fp32), outDims, basePath / "image_0_data_quantized" / "layer_11_output.bin"});
     expected.loadData();
     logInfo("Details for final layer:");
     outputs.back().compareWithinPrint<fp32>(expected);
@@ -726,13 +805,70 @@ void runThousandImageInferenceTest(const Model& model, const Path& basePath) {
     printf("Took %f milliseconds on average for naive\n", floatTimeMillis / numImages);
 }
 
+void runNImageTest(const Model& model, const Path& basePath, int numImages) {
+    char line[32];
+    int* classIndices = (int*) malloc(sizeof(int) * numImages);
+
+    FILE* metadata = fopen((basePath / "img_data/metadata.txt").c_str(), "r");
+    while(fgets(line, 32, metadata)) {
+        int index;
+        int classIndex;
+        if(sscanf(line, "%d,%d", &index, &classIndex) == 2) {
+            if(index >= numImages) break;
+            classIndices[index] = classIndex;
+        }
+    }
+    fclose(metadata);
+
+    int numCorrect = 0;
+
+    for(int i = 0; i < numImages; i++) {
+        char filename[32];
+        sprintf(filename, "image_%d.bin", i);
+
+        logInfo("--- Running Inference Test ---");
+        logInfo(filename);
+
+        dimVec inDims = {64, 64, 3};
+
+        LayerData img({sizeof(int8_t), inDims, basePath / "img_data_new" / filename});
+        img.loadData();
+
+        model.inference(img, Layer::InfType::ACCELERATED);
+
+        dimVec outDims = model.getOutputLayer().getOutputParams().dims;
+
+        unsigned int targetIndex = classIndices[i];
+
+        size_t maxIndex = 0;
+        for(size_t j = 0; j < outDims.at(0); j++) {
+            if(model.getOutputLayer().getOutputData().get<fp32>(j) > model.getOutputLayer().getOutputData().get<fp32>(maxIndex)) {
+                maxIndex = j;
+            }
+        }
+
+        if(targetIndex == maxIndex) numCorrect++;
+
+        printf("Inference %d, expected class %d, got class %ld\n", i, targetIndex, maxIndex);
+        printf("Value for expected class was %f\n", model.getOutputLayer().getOutputData().get<fp32>(targetIndex));
+    }
+
+    printf("Of %d inferences, %d were correct (Top 1)\n", numImages, numCorrect);
+
+    free(classIndices);
+}
+
 void runTests() {
     // Base input data path (determined from current directory of where you are running the command)
     Path basePath("data");  // May need to be altered for zedboards loading from SD Cards
 
     // Build the model and allocate the buffers
-    Model model = buildToyModel(basePath / "model");
+    Model model = buildToyModel(basePath / "model_new"); // pulling from new biases
     model.allocLayers();
+
+    runNImageTest(model, basePath, 100);
+
+    // runInferenceCheckLayersIntermediateQuantized(model, basePath);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);
@@ -756,9 +892,9 @@ void runTests() {
 
     // logInfo("Past delay");
 
-    for(int i = 0; i < 3; i++) {
-        runInferenceTimeLayersQuantized(model, basePath, i);
-    }
+    // for(int i = 0; i < 3; i++) {
+    //     runInferenceTimeLayersQuantized(model, basePath, i);
+    // }
 
     // for(int i = 0; i < 3; i++) {
         // runInferenceTimeLayersCustomQuantized(model, basePath, i);

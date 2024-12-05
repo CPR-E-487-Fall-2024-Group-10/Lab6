@@ -42,8 +42,8 @@ architecture Behavioral of dequantization is
     ----------------------------------------------------------------------------
     -- Constant Definitions
     ----------------------------------------------------------------------------
-    constant C_UPPER_BITS_ZERO : signed((C_DATA_WIDTH - C_OUT_WIDTH)-1 downto 0) := (others => '0');
-    constant C_UPPER_BITS_ONE  : signed((C_DATA_WIDTH - C_OUT_WIDTH)-1 downto 0) := (others => '1');
+    constant C_UPPER_BITS_ZERO : signed((C_DATA_WIDTH - C_OUT_WIDTH) downto 0) := (others => '0');
+    constant C_UPPER_BITS_ONE  : signed((C_DATA_WIDTH - C_OUT_WIDTH) downto 0) := (others => '1');
 
     ----------------------------------------------------------------------------
     -- Type Declarations
@@ -63,6 +63,11 @@ architecture Behavioral of dequantization is
 
     signal w_slave_tready           : std_logic;
     signal w_mult_result            : signed((2*C_DATA_WIDTH)-1 downto 0);
+    signal w_scaled_tready          : std_logic;
+    signal w_relued_tready          : std_logic;
+    signal w_zeroed_tready          : std_logic;
+    signal w_saturated_tready       : std_logic;
+    signal w_tready_arr             : std_logic_vector(3 downto 0);
 
 begin
 
@@ -74,43 +79,64 @@ begin
     M_AXIS_TID    <= q_tid(3);
     M_AXIS_TVALID <= q_tvalid(3);
 
-    S_AXIS_TREADY <= w_slave_tready;
+    -- S_AXIS_TREADY <= w_slave_tready;
+    S_AXIS_TREADY <= w_scaled_tready;
 
     ----------------------------------------------------------------------------
     -- Concurrent Signal Assignments
     ----------------------------------------------------------------------------
-    w_slave_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(3) = '1' else
-                      '1';
+    -- w_slave_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(3) = '1' else
+                    --   '1';
+
+    w_saturated_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(3) = '1' else
+                          '1';
+
+    w_zeroed_tready    <= '0' when w_saturated_tready = '0' and q_tvalid(2) = '1' else
+                          '1';
+
+    w_relued_tready    <= '0' when w_zeroed_tready = '0' and q_tvalid(1) = '1' else
+                          '1';
+
+    w_scaled_tready    <= '0' when w_relued_tready = '0' and q_tvalid(0) = '1' else
+                          '1';
+
+    w_tready_arr(0)    <= w_scaled_tready;
+    w_tready_arr(1)    <= w_relued_tready;
+    w_tready_arr(2)    <= w_zeroed_tready;
+    w_tready_arr(3)    <= w_saturated_tready;
 
     w_mult_result  <= signed(S_AXIS_TDATA) * signed(q_scale);
 
-    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_slave_tready = '1' else
+    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_scaled_tready = '1' and S_AXIS_TVALID = '1' else
                 q_scaled;
 
-    n_relued <= (others => '0') when w_slave_tready = '1' and relu = '1' and q_scaled(C_DATA_WIDTH-1) = '1' else
-                q_scaled        when w_slave_tready = '1' else
+    n_relued <= (others => '0') when w_relued_tready = '1' and relu = '1' and q_scaled(C_DATA_WIDTH-1) = '1' else
+                q_scaled        when w_relued_tready = '1' else
                 q_relued;
 
-    n_zeroed <= q_relued + resize(signed(q_zero), C_DATA_WIDTH) when w_slave_tready = '1' else
+    n_zeroed <= q_relued + resize(signed(q_zero), C_DATA_WIDTH) when w_zeroed_tready = '1' else
                 q_zeroed;
 
-    n_saturated <= q_zeroed(C_OUT_WIDTH-1 downto 0) when w_slave_tready = '1' and (q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH) = C_UPPER_BITS_ZERO or q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH) = C_UPPER_BITS_ONE) else
-                   (C_OUT_WIDTH-1 => '0', others => '1') when w_slave_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '0' else -- saturate positive
-                   (C_OUT_WIDTH-1 => '1', others => '0') when w_slave_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '1' else -- saturate negative
+    n_saturated <= q_zeroed(C_OUT_WIDTH-1 downto 0) when w_saturated_tready = '1' and (q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH-1) = C_UPPER_BITS_ZERO or q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH-1) = C_UPPER_BITS_ONE) else
+                   (C_OUT_WIDTH-1 => '0', others => '1') when w_saturated_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '0' else -- saturate positive
+                   (C_OUT_WIDTH-1 => '1', others => '0') when w_saturated_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '1' else -- saturate negative
                    q_saturated;
 
-    n_tvalid(0) <= S_AXIS_TVALID;
-    n_tlast(0)  <= S_AXIS_TLAST;
-    n_tid(0)    <= S_AXIS_TID;
+    n_tvalid(0) <= S_AXIS_TVALID when w_tready_arr(0) = '1' else
+                   q_tvalid(0);
+    n_tlast(0)  <= S_AXIS_TLAST when w_tready_arr(0) = '1' else
+                   q_tlast(0);
+    n_tid(0)    <= S_AXIS_TID when w_tready_arr(0) = '1' else
+                   q_tid(0);
 
     GEN_AXIS_CTRL_REGS : for I in 1 to 3 generate
-        n_tvalid(I) <= q_tvalid(I-1) when w_slave_tready = '1' else
+        n_tvalid(I) <= q_tvalid(I-1) when w_tready_arr(I) = '1' else
                        q_tvalid(I);
 
-        n_tlast(I)  <= q_tlast(I-1) when w_slave_tready = '1' else
+        n_tlast(I)  <= q_tlast(I-1) when w_tready_arr(I) = '1' else
                        q_tlast(I);
 
-        n_tid(I)    <= q_tid(I-1) when w_slave_tready = '1' else
+        n_tid(I)    <= q_tid(I-1) when w_tready_arr(I) = '1' else
                        q_tid(I);
     end generate;
 

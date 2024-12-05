@@ -42,8 +42,8 @@ architecture Behavioral of dequantization is
     ----------------------------------------------------------------------------
     -- Constant Definitions
     ----------------------------------------------------------------------------
-    constant C_UPPER_BITS_ZERO : signed((C_DATA_WIDTH - C_OUT_WIDTH)-1 downto 0) := (others => '0');
-    constant C_UPPER_BITS_ONE  : signed((C_DATA_WIDTH - C_OUT_WIDTH)-1 downto 0) := (others => '1');
+    constant C_UPPER_BITS_ZERO : signed((C_DATA_WIDTH - C_OUT_WIDTH) downto 0) := (others => '0');
+    constant C_UPPER_BITS_ONE  : signed((C_DATA_WIDTH - C_OUT_WIDTH) downto 0) := (others => '1');
 
     ----------------------------------------------------------------------------
     -- Type Declarations
@@ -107,7 +107,7 @@ begin
 
     w_mult_result  <= signed(S_AXIS_TDATA) * signed(q_scale);
 
-    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_scaled_tready = '1' else
+    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_scaled_tready = '1' and S_AXIS_TVALID = '1' else
                 q_scaled;
 
     n_relued <= (others => '0') when w_relued_tready = '1' and relu = '1' and q_scaled(C_DATA_WIDTH-1) = '1' else
@@ -117,7 +117,7 @@ begin
     n_zeroed <= q_relued + resize(signed(q_zero), C_DATA_WIDTH) when w_zeroed_tready = '1' else
                 q_zeroed;
 
-    n_saturated <= q_zeroed(C_OUT_WIDTH-1 downto 0) when w_saturated_tready = '1' and (q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH) = C_UPPER_BITS_ZERO or q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH) = C_UPPER_BITS_ONE) else
+    n_saturated <= q_zeroed(C_OUT_WIDTH-1 downto 0) when w_saturated_tready = '1' and (q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH-1) = C_UPPER_BITS_ZERO or q_zeroed(C_DATA_WIDTH-1 downto C_OUT_WIDTH-1) = C_UPPER_BITS_ONE) else
                    (C_OUT_WIDTH-1 => '0', others => '1') when w_saturated_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '0' else -- saturate positive
                    (C_OUT_WIDTH-1 => '1', others => '0') when w_saturated_tready = '1' and q_zeroed(C_DATA_WIDTH-1) = '1' else -- saturate negative
                    q_saturated;

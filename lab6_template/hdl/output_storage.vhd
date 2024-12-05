@@ -51,7 +51,7 @@ architecture Behavioral of output_storage is
     ----------------------------------------------------------------------------
     -- Type Definitions
     ----------------------------------------------------------------------------
-    type t_state is (S_IDLE, S_DELAY, S_READ, S_MODIFY, S_WRITE);
+    type t_state is (S_IDLE, S_LOAD_INIT, S_DELAY, S_READ, S_MODIFY, S_WRITE);
 
     ----------------------------------------------------------------------------
     -- Signal Declarations
@@ -77,6 +77,9 @@ architecture Behavioral of output_storage is
     signal w_tready                   : std_logic;
     signal w_bram_en                  : std_logic;
 
+    signal w_bram_addr_pool           : unsigned(31 downto 0);
+    signal w_bram_addr_no_pool        : unsigned(31 downto 0);
+
 begin
 
     ----------------------------------------------------------------------------
@@ -91,14 +94,14 @@ begin
     BRAM_rst  <= rst;
     BRAM_clk  <= clk;
 
+    conv_complete <= q_conv_done;
+
     ----------------------------------------------------------------------------
     -- Concurrent Signal Assignments
     ----------------------------------------------------------------------------
-    w_height <= unsigned(output_h)                             when max_pooling = '0' else
-                unsigned(output_h(DIM_WIDTH-2 downto 0)) & "0";
+    w_height <= unsigned(output_h);
 
-    w_width  <= unsigned(output_w)                             when max_pooling = '0' else
-                unsigned(output_w(DIM_WIDTH-2 downto 0)) & "0";
+    w_width <= unsigned(output_w);
 
     w_height_ovf <= '1' when q_height_cnt = w_height - 1 and w_width_ovf = '1' else
                     '0';
@@ -109,9 +112,6 @@ begin
     w_chan_ovf   <= '1' when q_chan_cnt = "11" and n_chan_cnt = "00" else
                     '0';
 
-    w_load_offset <= '1' when w_height_ovf = '1' else
-                     '0';
-
     n_conv_done <= '1' when w_height_ovf = '1' else
                    '0' when S_AXIS_TVALID = '1' else
                    q_conv_done;
@@ -119,16 +119,28 @@ begin
     n_tdata     <= S_AXIS_TDATA when S_AXIS_TVALID = '1' and w_tready = '1' else
                    q_tdata;
 
-    n_bram_addr <= q_bram_addr - shift_left(unsigned(elements_per_channel), 1) - unsigned(elements_per_channel) + 1 when w_rmw_done = '1' and q_chan_cnt = "11" else
-                   q_bram_addr + unsigned(elements_per_channel)     when w_rmw_done = '1' else
-                   resize(unsigned(initial_offset), 32)             when w_load_offset = '1' else
-                   q_bram_addr;
+    n_bram_addr <= w_bram_addr_no_pool when max_pooling = '0' else
+                   w_bram_addr_pool;
 
-    n_height_cnt <= (others => '0')  when q_height_cnt = w_height - 1 else
+    w_bram_addr_no_pool <= resize(unsigned(initial_offset), 32)             when w_load_offset = '1' else
+                           q_bram_addr - shift_left(unsigned(elements_per_channel), 1) - unsigned(elements_per_channel) + 1 when w_rmw_done = '1' and q_chan_cnt = "11" else
+                           q_bram_addr + unsigned(elements_per_channel)     when w_rmw_done = '1' else
+                           q_bram_addr;
+
+    w_bram_addr_pool <= resize(unsigned(initial_offset), 32) when w_load_offset = '1' else
+                        (((q_bram_addr + 1) - shift_left(unsigned(elements_per_channel), 1)) - unsigned(elements_per_channel)) - shift_right(unsigned(output_w), 1) when w_rmw_done = '1' and q_chan_cnt = "11" and w_width_ovf = '1' and q_height_cnt(0) = '0' else
+                        -- (((q_bram_addr + 2) - shift_left(unsigned(elements_per_channel), 1)) - unsigned(elements_per_channel)) - shift_right(unsigned(output_w), 1) when w_rmw_done = '1' and q_chan_cnt = "11" and w_width_ovf = '1' and q_height_cnt(0) = '1' else
+                        (((q_bram_addr + 1) - shift_left(unsigned(elements_per_channel), 1)) - unsigned(elements_per_channel)) when w_rmw_done = '1' and q_chan_cnt = "11" and w_width_ovf = '1' and q_height_cnt(0) = '1' else
+                        (q_bram_addr - shift_left(unsigned(elements_per_channel), 1)) - unsigned(elements_per_channel) when w_rmw_done = '1' and q_chan_cnt = "11" and q_width_cnt(0) = '0' else -- repeat current width and height
+                        ((q_bram_addr + 1) - shift_left(unsigned(elements_per_channel), 1)) - unsigned(elements_per_channel) when w_rmw_done = '1' and q_chan_cnt = "11" and q_width_cnt(0) = '1' else
+                        q_bram_addr + unsigned(elements_per_channel) when w_rmw_done = '1' else
+                        q_bram_addr;
+
+    n_height_cnt <= (others => '0')  when w_height_ovf = '1' else
                     q_height_cnt + 1 when w_width_ovf = '1'  else
                     q_height_cnt;
                    
-    n_width_cnt  <= (others => '0') when q_width_cnt = w_width - 1 else
+    n_width_cnt  <= (others => '0') when w_width_ovf = '1' else
                     q_width_cnt + 1 when w_chan_ovf = '1'          else
                     q_width_cnt;
 
@@ -138,7 +150,7 @@ begin
     ----------------------------------------------------------------------------
     -- Asynchronous Processes
     ----------------------------------------------------------------------------
-    SM_PROC : process(q_state, q_data_reg, q_tdata, q_height_cnt, q_width_cnt, q_bram_addr, q_bram_we, S_AXIS_TVALID, BRAM_dout, max_pooling)
+    SM_PROC : process(q_state, q_data_reg, q_tdata, q_height_cnt, q_width_cnt, q_bram_addr, q_bram_we, q_conv_done, S_AXIS_TVALID, BRAM_dout, max_pooling)
     begin
 
         n_state <= q_state;
@@ -149,6 +161,7 @@ begin
         w_cnt_incr    <= '0';
         w_tready      <= '0';
         w_bram_en     <= '0';
+        w_load_offset <= '0';
 
         case q_state is
         
@@ -157,10 +170,21 @@ begin
 
                 if S_AXIS_TVALID = '1' then
                     -- n_state <= S_READ;
-                    n_state <= S_DELAY;
+                    if q_conv_done = '1' then
+                        n_state <= S_LOAD_INIT;
 
-                    w_bram_en <= '1'; -- one cycle delay for BRAM reads, so need to set up here
+                        w_load_offset <= '1';
+                    else
+                        n_state <= S_DELAY;
+
+                        w_bram_en <= '1'; -- one cycle delay for BRAM reads, so need to set up here
+                    end if;
                 end if;
+
+            when S_LOAD_INIT =>
+                n_state <= S_DELAY;
+
+                w_bram_en <= '1';
 
             when S_DELAY =>
                 n_state <= S_READ;
@@ -197,22 +221,22 @@ begin
                     -- second or later pass at output, need to compare
                     case q_bram_addr(1 downto 0) is
                         when "00" =>
-                            if unsigned(q_tdata) > unsigned(q_data_reg(7 downto 0)) then
+                            if signed(q_tdata) > signed(q_data_reg(7 downto 0)) then
                                 n_data_reg(7 downto 0) <= q_tdata;
                             end if;
     
                         when "01" =>
-                            if unsigned(q_tdata) > unsigned(q_data_reg(15 downto 8)) then
+                            if signed(q_tdata) > signed(q_data_reg(15 downto 8)) then
                                 n_data_reg(15 downto 8) <= q_tdata;
                             end if;
     
                         when "10" =>
-                            if unsigned(q_tdata) > unsigned(q_data_reg(23 downto 16)) then
+                            if signed(q_tdata) > signed(q_data_reg(23 downto 16)) then
                                 n_data_reg(23 downto 16) <= q_tdata;
                             end if;
     
                         when "11" =>
-                            if unsigned(q_tdata) > unsigned(q_data_reg(31 downto 24)) then
+                            if signed(q_tdata) > signed(q_data_reg(31 downto 24)) then
                                 n_data_reg(31 downto 24) <= q_tdata;
                             end if;
     

@@ -7,9 +7,9 @@
 #include "Layer.h"
 
 #ifdef ZEDBOARD
-#include "xllfifo_hw.h"
 #include "xparameters.h"
 #include "xil_io.h"
+#include "MLP.h"
 #endif
 
 namespace ML {
@@ -118,36 +118,68 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
     for(int n = 0; n < 1; n++) {
 
         // now doing channel as most significant index
+        #ifdef ZEDBOARD
+        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_ACTIVATIONS));
+        memcpy_dma(MLP_INPUTS, dataIn.getRaw<int8_t>(), inWidth * inHeight * numIfMaps);
+        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_ACTIVATIONS));
+
+        int diff_fw = 1 - kernelWidth + inWidth;
+        int diff_fh = diff_fw - (inWidth * kernelHeight) + (inWidth * inHeight);
+        int diff_fc = diff_fh - (inWidth * inHeight * kernelDepth) + 1;
+        int diff_ow = diff_fc + (kernelWidth - 1);
+        // int diff_fh = ((inHeight * inWidth) - (inWidth * (kernelHeight - 1))) - (kernelWidth - 1);
+        // int diff_fc = ((-inHeight * inWidth * (numIfMaps - 1)) - (inWidth * (kernelHeight - 1))) - (kernelWidth - 2);
+        // int diff_ow = ((-inHeight * inWidth * (numIfMaps - 1)) - (inWidth * (kernelHeight - 1))) + 1;
+
+        // Configure HW accelerator (no idea if this is correct)
+        Xil_Out32(MLP_FILTER_W, kernelWidth);
+        Xil_Out32(MLP_FILTER_H, kernelHeight);
+        Xil_Out32(MLP_FILTER_C, kernelDepth);
+        Xil_Out32(MLP_OUTPUT_W, outWidth);
+        Xil_Out32(MLP_OUTPUT_H, outHeight);
+        Xil_Out32(MLP_INPUT_END_DIFF_FW, diff_fw);
+        Xil_Out32(MLP_INPUT_END_DIFF_FH, diff_fh);
+        Xil_Out32(MLP_INPUT_END_DIFF_FC, diff_fc);
+        Xil_Out32(MLP_INPUT_END_DIFF_OW, diff_ow);
+        Xil_Out32(MLP_OUTPUT_ELEMENTS_PER_CHANNEL, outHeight * outWidth);
+        Xil_Out32(MLP_OUTPUT_INITIAL_OFFSET, 0); // TODO this will change once we are keeping data in accelerator
+        Xil_Out32(MLP_Q_SCALE, finalScale); // Quantization scaling
+        Xil_Out32(MLP_Q_ZERO, next_zero_point); // Zero-point adjustment
+        Xil_Out32(MLP_CTRLB, MLP_CTRLB_RELU);
+
+        for(int m = 0; m < numOfMaps / 4; m++) {
+            // Transfer input data and weights to BRAM
+            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_FILTERS));
+            
+            memcpy_dma(MLP_FILTER0, getWeightData().getRaw<int8_t>() + (m * kernelWidth + kernelHeight * kernelDepth), kernelWidth * kernelHeight * kernelDepth);
+            memcpy_dma(MLP_FILTER1, getWeightData().getRaw<int8_t>() + ((m + 1) * kernelWidth + kernelHeight * kernelDepth), kernelWidth * kernelHeight * kernelDepth);
+            memcpy_dma(MLP_FILTER2, getWeightData().getRaw<int8_t>() + ((m + 2) * kernelWidth + kernelHeight * kernelDepth), kernelWidth * kernelHeight * kernelDepth);
+            memcpy_dma(MLP_FILTER3, getWeightData().getRaw<int8_t>() + ((m + 3) * kernelWidth + kernelHeight * kernelDepth), kernelWidth * kernelHeight * kernelDepth);
+
+            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_FILTERS)); // swap the values we just wrote into use
+
+            Xil_Out32(MLP_MAC0_BIAS, getBiasData().get<int32_t>(m));
+            Xil_Out32(MLP_MAC1_BIAS, getBiasData().get<int32_t>(m + 1));
+            Xil_Out32(MLP_MAC2_BIAS, getBiasData().get<int32_t>(m + 2));
+            Xil_Out32(MLP_MAC3_BIAS, getBiasData().get<int32_t>(m + 3));
+
+            // trigger HW accelerator
+            Xil_Out32(MLP_CTRLA, ~(MLP_CTRLA_CONV_IDLE));
+
+            int cnt = 0;
+
+            // Wait for computation to complete
+            while(!(Xil_In32(MLP_CTRLA) & MLP_CTRLA_CONV_IDLE)) cnt++;
+
+            printf("Took %d iterations for conv idle to happen\n", cnt);
+
+            // Transfer output data from BRAM to DDR
+            memcpy_dma(getOutputData().getRaw<int8_t>() + (4 * m * outHeight * outWidth), MLP_OUTPUTS, 4 * outWidth * outHeight);
+        }
+        #else
         for(int m = 0; m < numOfMaps; m++) {
             for(int q = 0; q < outWidth; q++) {
                 for(int p = 0; p < outHeight; p++) {
-                    #ifdef ZEDBOARD
-                    // TODO - implement DMA transfers
-                    
-                    // Transfer input data and weights to BRAM
-                    memcpy_dma(MLP_INPUTS, dataIn.data(), inWidth * inHeight * numIfMaps);
-                    memcpy_dma(MLP_FILTER0, getWeightData().data(), kernelWidth * kernelHeight * kernelDepth * numKernels);
-
-                    // Configure HW accelerator (no idea if this is correct)
-                    Xil_Out32(MLP_FILTER_W, kernelWidth);
-                    Xil_Out32(MLP_FILTER_H, kernelHeight);
-                    Xil_Out32(MLP_FILTER_C, kernelDepth);
-                    Xil_Out32(MLP_OUTPUT_W, outWidth);
-                    Xil_Out32(MLP_OUTPUT_H, outHeight);
-                    Xil_Out32(MLP_Q_SCALE, finalScale); // Quantization scaling
-                    Xil_Out32(MLP_Q_ZERO, next_zero_point); // Zero-point adjustment
-
-                    // trigger HW accelerator
-                    Xil_Out32(MLP_CTRLA, 0x1);
-
-                    // Wait for computation to complete
-                    while(!(Xil_In32(MLP_CTRLA) & MLP_CTRLA_CONV_IDLE));
-
-                    // Transfer output data from BRAM to DDR
-                    memcpy_dma(getOutputData().data(), MLP_OUTPUTS, outWidth * outHeight * numOfMaps);
-
-                    #else
-
                     // iterate for each pixel in the input feature map
                     int32_t channelSum = 0;
                     for(int c = 0; c < kernelDepth; c++) {
@@ -203,10 +235,10 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
 
                     getOutputData().get<int8_t>(outIndex) = static_cast<int8_t>(zeroed);
 
-                    #endif
                 }
             }
         }
+        #endif
     }
 }
 

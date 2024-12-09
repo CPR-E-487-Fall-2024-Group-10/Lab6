@@ -70,6 +70,10 @@ class LayerData {
         return ((T*)data.get())[flat_index];
     }
 
+    template <typename T> T* getRaw() const {
+        return ((T*) data.get());
+    }
+
     // Allocate data values
     inline void allocData() {
         if (data) return;

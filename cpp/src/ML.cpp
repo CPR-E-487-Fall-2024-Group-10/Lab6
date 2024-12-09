@@ -866,9 +866,9 @@ void runTests() {
     Model model = buildToyModel(basePath / "model_new"); // pulling from new biases
     model.allocLayers();
 
-    runNImageTest(model, basePath, 100);
+    // runNImageTest(model, basePath, 50);
 
-    // runInferenceCheckLayersIntermediateQuantized(model, basePath);
+    runInferenceCheckLayersIntermediateQuantized(model, basePath);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);

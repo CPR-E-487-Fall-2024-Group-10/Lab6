@@ -123,6 +123,29 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
                 for(int p = 0; p < outHeight; p++) {
                     #ifdef ZEDBOARD
                     // TODO - implement DMA transfers
+                    
+                    // Transfer input data and weights to BRAM
+                    memcpy_dma(MLP_INPUTS, dataIn.data(), inWidth * inHeight * numIfMaps);
+                    memcpy_dma(MLP_FILTER0, getWeightData().data(), kernelWidth * kernelHeight * kernelDepth * numKernels);
+
+                    // Configure HW accelerator (no idea if this is correct)
+                    Xil_Out32(MLP_FILTER_W, kernelWidth);
+                    Xil_Out32(MLP_FILTER_H, kernelHeight);
+                    Xil_Out32(MLP_FILTER_C, kernelDepth);
+                    Xil_Out32(MLP_OUTPUT_W, outWidth);
+                    Xil_Out32(MLP_OUTPUT_H, outHeight);
+                    Xil_Out32(MLP_Q_SCALE, finalScale); // Quantization scaling
+                    Xil_Out32(MLP_Q_ZERO, next_zero_point); // Zero-point adjustment
+
+                    // trigger HW accelerator
+                    Xil_Out32(MLP_CTRLA, 0x1);
+
+                    // Wait for computation to complete
+                    while(!(Xil_In32(MLP_CTRLA) & MLP_CTRLA_CONV_IDLE));
+
+                    // Transfer output data from BRAM to DDR
+                    memcpy_dma(getOutputData().data(), MLP_OUTPUTS, outWidth * outHeight * numOfMaps);
+
                     #else
 
                     // iterate for each pixel in the input feature map

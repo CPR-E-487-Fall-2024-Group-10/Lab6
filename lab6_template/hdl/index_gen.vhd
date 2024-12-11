@@ -73,6 +73,17 @@ architecture Behavioral of index_gen is
 
     signal w_count_active       : std_logic;
 
+    attribute MARK_DEBUG : string;
+
+    attribute MARK_DEBUG of w_filter_channel_ovf : signal is "true";
+    attribute MARK_DEBUG of w_filter_height_ovf : signal is "true";
+    attribute MARK_DEBUG of w_filter_width_ovf : signal is "true";
+    attribute MARK_DEBUG of w_output_height_ovf : signal is "true";
+    attribute MARK_DEBUG of w_output_width_ovf : signal is "true";
+
+    attribute MARK_DEBUG of q_filter_addr : signal is "true";
+    attribute MARK_DEBUG of q_input_addr : signal is "true";
+
 begin
 
     ----------------------------------------------------------------------------

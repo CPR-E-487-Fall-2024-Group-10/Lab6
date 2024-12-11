@@ -147,6 +147,8 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
         Xil_Out32(MLP_Q_ZERO, next_zero_point); // Zero-point adjustment
         Xil_Out32(MLP_CTRLB, MLP_CTRLB_RELU);
 
+        memset(getOutputData().getRaw<int8_t>(), 0, numOfMaps * outWidth * outHeight);
+
         for(int m = 0; m < numOfMaps / 4; m++) {
             // Transfer input data and weights to BRAM
             // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_FILTERS));

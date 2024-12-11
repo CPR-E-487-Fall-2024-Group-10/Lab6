@@ -61,6 +61,18 @@ architecture Behavioral of dequantization is
     signal q_tlast,     n_tlast     : std_logic_vector(3 downto 0);
     signal q_tid,       n_tid       : t_tid_arr;
 
+    attribute MARK_DEBUG : string;
+
+    attribute MARK_DEBUG of q_scaled : signal is "true";
+    attribute MARK_DEBUG of q_relued : signal is "true";
+    attribute MARK_DEBUG of q_zeroed : signal is "true";
+    attribute MARK_DEBUG of q_saturated : signal is "true";
+    attribute MARK_DEBUG of q_tvalid : signal is "true";
+    
+    attribute MARK_DEBUG of relu : signal is "true";
+    attribute MARK_DEBUG of q_scale : signal is "true";
+    attribute MARK_DEBUG of q_zero : signal is "true";
+
     signal w_slave_tready           : std_logic;
     signal w_mult_result            : signed((2*C_DATA_WIDTH)-1 downto 0);
     signal w_scaled_tready          : std_logic;

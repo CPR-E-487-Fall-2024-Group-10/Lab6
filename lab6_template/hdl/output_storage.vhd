@@ -112,8 +112,10 @@ begin
     w_chan_ovf   <= '1' when q_chan_cnt = "11" and n_chan_cnt = "00" else
                     '0';
 
+    w_load_offset <= conv_idle;
+
     n_conv_done <= '1' when w_height_ovf = '1' else
-                   '0' when S_AXIS_TVALID = '1' else
+                   '0' when conv_idle = '1' else
                    q_conv_done;
 
     n_tdata     <= S_AXIS_TDATA when S_AXIS_TVALID = '1' and w_tready = '1' else
@@ -150,7 +152,7 @@ begin
     ----------------------------------------------------------------------------
     -- Asynchronous Processes
     ----------------------------------------------------------------------------
-    SM_PROC : process(q_state, q_data_reg, q_tdata, q_height_cnt, q_width_cnt, q_bram_addr, q_bram_we, q_conv_done, S_AXIS_TVALID, BRAM_dout, max_pooling)
+    SM_PROC : process(q_state, q_data_reg, q_tdata, q_height_cnt, q_width_cnt, q_bram_addr, q_bram_we, conv_idle, S_AXIS_TVALID, BRAM_dout, max_pooling)
     begin
 
         n_state <= q_state;
@@ -161,7 +163,7 @@ begin
         w_cnt_incr    <= '0';
         w_tready      <= '0';
         w_bram_en     <= '0';
-        w_load_offset <= '0';
+        -- w_load_offset <= '0';
 
         case q_state is
         
@@ -169,16 +171,9 @@ begin
                 w_tready <= '1';
 
                 if S_AXIS_TVALID = '1' then
-                    -- n_state <= S_READ;
-                    if q_conv_done = '1' then
-                        n_state <= S_LOAD_INIT;
+                    n_state <= S_DELAY;
 
-                        w_load_offset <= '1';
-                    else
-                        n_state <= S_DELAY;
-
-                        w_bram_en <= '1'; -- one cycle delay for BRAM reads, so need to set up here
-                    end if;
+                    w_bram_en <= '1'; -- one cycle delay for BRAM reads, so need to set up here
                 end if;
 
             when S_LOAD_INIT =>

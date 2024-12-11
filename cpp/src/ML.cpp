@@ -15,6 +15,7 @@
 
 #ifdef ZEDBOARD
 #include <file_transfer/file_transfer.h>
+#include "MLP.h"
 #endif
 
 namespace ML {
@@ -866,6 +867,18 @@ void runTests() {
     Model model = buildToyModel(basePath / "model_new"); // pulling from new biases
     model.allocLayers();
 
+    #ifdef ZEDBOARD
+    runMemoryTest();
+    #endif
+
+    logInfo("Delaying...");
+
+    for(int i = 0; i < 1000000000; i++) {
+        asm("nop");
+    }
+
+    logInfo("Past delay");
+
     // runNImageTest(model, basePath, 50);
 
     runInferenceCheckLayersIntermediateQuantized(model, basePath);
@@ -883,14 +896,6 @@ void runTests() {
         // runInferenceTest(model, basePath, i);
         // runInferenceTimeLayers(model, basePath, i);
     // }
-
-    // logInfo("Delaying...");
-
-    // for(int i = 0; i < 1000000000; i++) {
-    //     asm("nop");
-    // }
-
-    // logInfo("Past delay");
 
     // for(int i = 0; i < 3; i++) {
     //     runInferenceTimeLayersQuantized(model, basePath, i);

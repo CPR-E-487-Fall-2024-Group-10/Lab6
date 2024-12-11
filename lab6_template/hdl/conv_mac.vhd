@@ -59,6 +59,13 @@ architecture behavioral of conv_mac is
     signal w_acc_clr  : std_logic;
     signal w_add_bias : std_logic;
 
+    attribute MARK_DEBUG : string;
+
+    attribute MARK_DEBUG of q_accumulator : signal is "true";
+    attribute MARK_DEBUG of w_tvalid : signal is "true";
+    attribute MARK_DEBUG of w_tlast : signal is "true";
+    attribute MARK_DEBUG of w_add_bias : signal is "true";
+
 begin
 
     ----------------------------------------------------------------------------

@@ -69,18 +69,20 @@ namespace ML {
         for(int n = 0; n < 1; n++) {
             #ifdef ZEDBOARD
             // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_ACTIVATIONS));
-            memcpy_dma(MLP_INPUTS, dataIn.getRaw<int8_t>(), numIfMaps);
             // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_ACTIVATIONS));
 
             int diff_fw = 1;
             int diff_fh = 1;
-            int diff_fc = 1;
-            int diff_ow = (-numIfMaps) + 1;
+            // int diff_fc = 1;
+            int diff_fc = (-numIfMaps) + 2;
+            // int diff_ow = (-numIfMaps) + 1;
+            int diff_ow = diff_fc;
 
             // Configure HW accelerator (no idea if this is correct)
+            Xil_Out32(MLP_CTRLA, MLP_CTRLA_CONV_IDLE);
             Xil_Out32(MLP_FILTER_W, 1);
             Xil_Out32(MLP_FILTER_H, 1);
-            Xil_Out32(MLP_FILTER_C, numOfMaps);
+            Xil_Out32(MLP_FILTER_C, numIfMaps);
             Xil_Out32(MLP_OUTPUT_W, 1);
             Xil_Out32(MLP_OUTPUT_H, 1);
             Xil_Out32(MLP_INPUT_END_DIFF_FW, diff_fw);
@@ -96,22 +98,24 @@ namespace ML {
             } else {
                 Xil_Out32(MLP_CTRLB, 0);
             }
+            
+            memcpy_dma(MLP_INPUTS, dataIn.getRaw<int8_t>(), numIfMaps);
 
             for(int m = 0; m < numOfMaps / 4; m++) {
                 // Transfer input data and weights to BRAM
-                // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_FILTERS));
+                Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_FILTERS));
 
-                memcpy_dma(MLP_FILTER0, getWeightData().getRaw<int8_t>() + (m * numIfMaps), numIfMaps * numOfMaps);
-                memcpy_dma(MLP_FILTER1, getWeightData().getRaw<int8_t>() + ((m + 1) * numIfMaps), numIfMaps * numOfMaps);
-                memcpy_dma(MLP_FILTER2, getWeightData().getRaw<int8_t>() + ((m + 2) * numIfMaps), numIfMaps * numOfMaps);
-                memcpy_dma(MLP_FILTER3, getWeightData().getRaw<int8_t>() + ((m + 3) * numIfMaps), numIfMaps * numOfMaps);
+                memcpy_dma(MLP_FILTER0, getWeightData().getRaw<int8_t>() + ((4 * m) * numIfMaps), numIfMaps);
+                memcpy_dma(MLP_FILTER1, getWeightData().getRaw<int8_t>() + (((4 * m) + 1) * numIfMaps), numIfMaps);
+                memcpy_dma(MLP_FILTER2, getWeightData().getRaw<int8_t>() + (((4 * m) + 2) * numIfMaps), numIfMaps);
+                memcpy_dma(MLP_FILTER3, getWeightData().getRaw<int8_t>() + (((4 * m) + 3) * numIfMaps), numIfMaps);
 
-                // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_FILTERS)); // swap the values we just wrote into use
+                Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_FILTERS)); // swap the values we just wrote into use
 
-                Xil_Out32(MLP_MAC0_BIAS, getBiasData().get<int32_t>(m));
-                Xil_Out32(MLP_MAC1_BIAS, getBiasData().get<int32_t>(m + 1));
-                Xil_Out32(MLP_MAC2_BIAS, getBiasData().get<int32_t>(m + 2));
-                Xil_Out32(MLP_MAC3_BIAS, getBiasData().get<int32_t>(m + 3));
+                Xil_Out32(MLP_MAC0_BIAS, getBiasData().get<int32_t>(4 * m));
+                Xil_Out32(MLP_MAC1_BIAS, getBiasData().get<int32_t>((4 * m) + 1));
+                Xil_Out32(MLP_MAC2_BIAS, getBiasData().get<int32_t>((4 * m) + 2));
+                Xil_Out32(MLP_MAC3_BIAS, getBiasData().get<int32_t>((4 * m) + 3));
 
                 // trigger HW accelerator
                 Xil_Out32(MLP_CTRLA, ~(MLP_CTRLA_CONV_IDLE));

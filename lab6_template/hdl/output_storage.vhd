@@ -80,6 +80,17 @@ architecture Behavioral of output_storage is
     signal w_bram_addr_pool           : unsigned(31 downto 0);
     signal w_bram_addr_no_pool        : unsigned(31 downto 0);
 
+    attribute MARK_DEBUG : string;
+
+    attribute MARK_DEBUG of q_bram_addr : signal is "true";
+    attribute MARK_DEBUG of max_pooling : signal is "true";
+    attribute MARK_DEBUG of elements_per_channel : signal is "true";
+    attribute MARK_DEBUG of output_w : signal is "true";
+    attribute MARK_DEBUG of output_h : signal is "true";
+    attribute MARK_DEBUG of initial_offset : signal is "true";
+    attribute MARK_DEBUG of conv_complete : signal is "true";
+    attribute MARK_DEBUG of conv_idle : signal is "true";
+
 begin
 
     ----------------------------------------------------------------------------

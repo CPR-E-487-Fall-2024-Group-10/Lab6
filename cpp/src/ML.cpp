@@ -16,6 +16,7 @@
 #ifdef ZEDBOARD
 #include <file_transfer/file_transfer.h>
 #include "MLP.h"
+#include "xil_io.h"
 #endif
 
 namespace ML {
@@ -860,6 +861,10 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
 }
 
 void runTests() {
+    #ifdef ZEDBOARD
+    Xil_DCacheDisable();
+    #endif
+
     // Base input data path (determined from current directory of where you are running the command)
     Path basePath("data");  // May need to be altered for zedboards loading from SD Cards
 
@@ -873,7 +878,8 @@ void runTests() {
 
     logInfo("Delaying...");
 
-    for(int i = 0; i < 1000000000; i++) {
+    // for(int i = 0; i < 1000000000; i++) {
+    for(int i = 0; i < 10000000; i++) {
         asm("nop");
     }
 

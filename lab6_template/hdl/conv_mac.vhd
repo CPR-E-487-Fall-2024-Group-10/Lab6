@@ -65,6 +65,9 @@ architecture behavioral of conv_mac is
     attribute MARK_DEBUG of w_tvalid : signal is "true";
     attribute MARK_DEBUG of w_tlast : signal is "true";
     attribute MARK_DEBUG of w_add_bias : signal is "true";
+    attribute MARK_DEBUG of S_AXIS_TDATA : signal is "true";
+    attribute MARK_DEBUG of S_AXIS_TVALID : signal is "true";
+    attribute MARK_DEBUG of S_AXIS_TREADY : signal is "true";
 
 begin
 

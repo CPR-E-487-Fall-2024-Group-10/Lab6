@@ -811,7 +811,18 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
     char line[32];
     int* classIndices = (int*) malloc(sizeof(int) * numImages);
 
-    FILE* metadata = fopen((basePath / "img_data/metadata.txt").c_str(), "r");
+    #ifdef ZEDBOARD
+    // FIL file;
+    // if (f_open(&file, params.filePath.c_str(), FA_OPEN_EXISTING | FA_READ) == FR_OK) {
+    //     std::cout << "Opened metadata file" << std::endl;
+    // } else {
+    //     throw std::runtime_error("Failed to open metadata file");
+    // }
+
+    // UINT bytes_read = 0;
+    // f_read(&file, data.get(), params.byte_size(), &bytes_read)
+    #else
+    FILE* metadata = fopen((basePath / "img_data_new/metadata.txt").c_str(), "r");
     while(fgets(line, 32, metadata)) {
         int index;
         int classIndex;
@@ -821,10 +832,14 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
         }
     }
     fclose(metadata);
+    #endif
 
     int numCorrect = 0;
 
+    float timeTaken = 0.0f;
+
     for(int i = 0; i < numImages; i++) {
+        printf("For loop iteration %d\n", i);
         char filename[32];
         sprintf(filename, "image_%d.bin", i);
 
@@ -836,8 +851,14 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
         LayerData img({sizeof(int8_t), inDims, basePath / "img_data_new" / filename});
         img.loadData();
 
+        Timer timer("Inference Timer");
+        timer.start();
         model.inference(img, Layer::InfType::ACCELERATED);
+        timer.stop();
 
+        timeTaken += timer.milliseconds;
+
+        #ifndef ZEDBOARD
         dimVec outDims = model.getOutputLayer().getOutputParams().dims;
 
         unsigned int targetIndex = classIndices[i];
@@ -853,9 +874,11 @@ void runNImageTest(const Model& model, const Path& basePath, int numImages) {
 
         printf("Inference %d, expected class %d, got class %ld\n", i, targetIndex, maxIndex);
         printf("Value for expected class was %f\n", model.getOutputLayer().getOutputData().get<fp32>(targetIndex));
+        #endif
     }
 
     printf("Of %d inferences, %d were correct (Top 1)\n", numImages, numCorrect);
+    printf("Inferences took %f milliseconds total, an average of %f per image\n", timeTaken, timeTaken / numImages);
 
     free(classIndices);
 }
@@ -873,21 +896,21 @@ void runTests() {
     model.allocLayers();
 
     #ifdef ZEDBOARD
-    runMemoryTest();
+    // runMemoryTest();
     #endif
 
-    logInfo("Delaying...");
+    // logInfo("Delaying...");
 
     // for(int i = 0; i < 1000000000; i++) {
-    for(int i = 0; i < 10000000; i++) {
-        asm("nop");
-    }
+    // for(int i = 0; i < 10000000; i++) {
+    //     asm("nop");
+    // }
 
-    logInfo("Past delay");
+    // logInfo("Past delay");
 
-    // runNImageTest(model, basePath, 50);
+    runNImageTest(model, basePath, 50);
 
-    runInferenceCheckLayersIntermediateQuantized(model, basePath);
+    // runInferenceCheckLayersIntermediateQuantized(model, basePath);
 
     // Run some framework tests as an example of loading data
     // runBasicTest(model, basePath);

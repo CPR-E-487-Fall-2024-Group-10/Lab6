@@ -68,14 +68,9 @@ namespace ML {
 
         for(int n = 0; n < 1; n++) {
             #ifdef ZEDBOARD
-            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_ACTIVATIONS));
-            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_ACTIVATIONS));
-
             int diff_fw = 1;
             int diff_fh = 1;
-            // int diff_fc = 1;
             int diff_fc = (-numIfMaps) + 2;
-            // int diff_ow = (-numIfMaps) + 1;
             int diff_ow = diff_fc;
 
             // Configure HW accelerator (no idea if this is correct)

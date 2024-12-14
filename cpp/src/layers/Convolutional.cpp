@@ -119,16 +119,10 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
 
         // now doing channel as most significant index
         #ifdef ZEDBOARD
-        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_ACTIVATIONS));
-        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_ACTIVATIONS));
-
         int diff_fw = 1 - kernelWidth + inWidth;
         int diff_fh = diff_fw - (inWidth * kernelHeight) + (inWidth * inHeight);
         int diff_fc = diff_fh - (inWidth * inHeight * kernelDepth) + 1;
         int diff_ow = diff_fc + (kernelWidth - 1);
-        // int diff_fh = ((inHeight * inWidth) - (inWidth * (kernelHeight - 1))) - (kernelWidth - 1);
-        // int diff_fc = ((-inHeight * inWidth * (numIfMaps - 1)) - (inWidth * (kernelHeight - 1))) - (kernelWidth - 2);
-        // int diff_ow = ((-inHeight * inWidth * (numIfMaps - 1)) - (inWidth * (kernelHeight - 1))) + 1;
 
         // Configure HW accelerator (no idea if this is correct)
         Xil_Out32(MLP_CTRLA, MLP_CTRLA_CONV_IDLE);
@@ -147,24 +141,12 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
         Xil_Out32(MLP_Q_ZERO, next_zero_point); // Zero-point adjustment
         Xil_Out32(MLP_CTRLB, MLP_CTRLB_RELU);
 
-        // write input to bank 0
-        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~MLP_CTRLB_SWAP_ACTIVATIONS);
-
         memcpy_dma(MLP_INPUTS, dataIn.getRaw<int8_t>(), inWidth * inHeight * numIfMaps);
-
-        // swap so that bank 0 is used by accelerator
-        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | MLP_CTRLB_SWAP_ACTIVATIONS);
 
         memset(getOutputData().getRaw<int8_t>(), 0, numOfMaps * outWidth * outHeight);
 
-        printf("First 5 weights and inputs:\n");
-        for(int i = 0; i < 5; i++) {
-            printf("Weight %d: %d, Input %d: %d\n", i, getWeightData().get<int8_t>(i), i, dataIn.get<int8_t>(i));
-        }
-
         for(int m = 0; m < numOfMaps / 4; m++) {
             // Transfer input data and weights to BRAM
-            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~(MLP_CTRLB_SWAP_FILTERS));
 
             // write weight data to bank 0
             Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~MLP_CTRLB_SWAP_FILTERS);
@@ -177,52 +159,21 @@ void ConvolutionalLayer::computeAccelerated(const LayerData& dataIn, const Quant
             // swap so that bank 0 is used by accelerator
             Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | MLP_CTRLB_SWAP_FILTERS);
 
-            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | (MLP_CTRLB_SWAP_FILTERS)); // swap the values we just wrote into use
-
             Xil_Out32(MLP_MAC0_BIAS, getBiasData().get<int32_t>(4 * m));
             Xil_Out32(MLP_MAC1_BIAS, getBiasData().get<int32_t>((4 * m) + 1));
             Xil_Out32(MLP_MAC2_BIAS, getBiasData().get<int32_t>((4 * m) + 2));
             Xil_Out32(MLP_MAC3_BIAS, getBiasData().get<int32_t>((4 * m) + 3));
 
-            if(m == 0) {
-                printf("First 5 weights and inputs (from SRAM):\n");
-                int8_t weights[5];
-                int8_t inputs[5];
-                memcpy_dma(weights, MLP_FILTER0, 5);
-                memcpy_dma(inputs, MLP_INPUTS, 5);
-                for(int i = 0; i < 5; i++) {
-                    printf("Weight %d: %d, Input %d: %d\n", i, weights[i], i, inputs[i]);
-                }
-            }
-
             // trigger HW accelerator
             Xil_Out32(MLP_CTRLA, ~(MLP_CTRLA_CONV_IDLE));
 
-            int cnt = 0;
-
             // Wait for computation to complete
-            while(!(Xil_In32(MLP_CTRLA) & MLP_CTRLA_CONV_IDLE)) cnt++;
-
-            printf("Took %d iterations for conv idle to happen\n", cnt);
+            while(!(Xil_In32(MLP_CTRLA) & MLP_CTRLA_CONV_IDLE));
 
             // Transfer output data from BRAM to DDR
-            // swap to read from bank 0
-            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) | MLP_CTRLB_SWAP_ACTIVATIONS);
             memcpy_dma(getOutputData().getRaw<int8_t>() + (4 * m * outHeight * outWidth), MLP_OUTPUTS, 4 * outWidth * outHeight);
-            if(m == 0) {
-                printf("First byte of output: %d\n", getOutputData().get<int8_t>(0));
-            }
-            // swap back so accelerator uses bank 0
-            // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~MLP_CTRLB_SWAP_ACTIVATIONS);
         }
-
-        // Xil_Out32(MLP_CTRLB, Xil_In32(MLP_CTRLB) & ~MLP_CTRLB_SWAP_ACTIVATIONS);
         #else
-        printf("First 5 weights and inputs:\n");
-        for(int i = 0; i < 5; i++) {
-            printf("Weight %d: %d, Input %d: %d\n", i, getWeightData().get<int8_t>(i), i, dataIn.get<int8_t>(i));
-        }
-
         for(int m = 0; m < numOfMaps; m++) {
             for(int q = 0; q < outWidth; q++) {
                 for(int p = 0; p < outHeight; p++) {

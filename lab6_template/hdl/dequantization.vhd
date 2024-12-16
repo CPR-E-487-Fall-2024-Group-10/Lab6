@@ -48,17 +48,18 @@ architecture Behavioral of dequantization is
     ----------------------------------------------------------------------------
     -- Type Declarations
     ----------------------------------------------------------------------------
-    type t_tid_arr is array (0 to 3) of std_logic_vector(C_TID_WIDTH-1 downto 0);
+    type t_tid_arr is array (0 to 4) of std_logic_vector(C_TID_WIDTH-1 downto 0);
 
     ----------------------------------------------------------------------------
     -- Signal Declarations
     ----------------------------------------------------------------------------
+    signal q_data,      n_data      : signed(C_DATA_WIDTH-1 downto 0);
     signal q_scaled,    n_scaled    : signed(C_DATA_WIDTH-1 downto 0);
     signal q_relued,    n_relued    : signed(C_DATA_WIDTH-1 downto 0);
     signal q_zeroed,    n_zeroed    : signed(C_DATA_WIDTH-1 downto 0);
     signal q_saturated, n_saturated : signed(C_OUT_WIDTH-1 downto 0);
-    signal q_tvalid,    n_tvalid    : std_logic_vector(3 downto 0); -- valid signal for each stage of pipeline
-    signal q_tlast,     n_tlast     : std_logic_vector(3 downto 0);
+    signal q_tvalid,    n_tvalid    : std_logic_vector(4 downto 0); -- valid signal for each stage of pipeline
+    signal q_tlast,     n_tlast     : std_logic_vector(4 downto 0);
     signal q_tid,       n_tid       : t_tid_arr;
 
     attribute MARK_DEBUG : string;
@@ -75,11 +76,12 @@ architecture Behavioral of dequantization is
 
     signal w_slave_tready           : std_logic;
     signal w_mult_result            : signed((2*C_DATA_WIDTH)-1 downto 0);
+    signal w_data_tready            : std_logic;
     signal w_scaled_tready          : std_logic;
     signal w_relued_tready          : std_logic;
     signal w_zeroed_tready          : std_logic;
     signal w_saturated_tready       : std_logic;
-    signal w_tready_arr             : std_logic_vector(3 downto 0);
+    signal w_tready_arr             : std_logic_vector(4 downto 0);
 
 begin
 
@@ -100,26 +102,33 @@ begin
     -- w_slave_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(3) = '1' else
                     --   '1';
 
-    w_saturated_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(3) = '1' else
+    w_saturated_tready <= '0' when M_AXIS_TREADY = '0' and q_tvalid(4) = '1' else
                           '1';
 
-    w_zeroed_tready    <= '0' when w_saturated_tready = '0' and q_tvalid(2) = '1' else
+    w_zeroed_tready    <= '0' when w_saturated_tready = '0' and q_tvalid(3) = '1' else
                           '1';
 
-    w_relued_tready    <= '0' when w_zeroed_tready = '0' and q_tvalid(1) = '1' else
+    w_relued_tready    <= '0' when w_zeroed_tready = '0' and q_tvalid(2) = '1' else
                           '1';
 
-    w_scaled_tready    <= '0' when w_relued_tready = '0' and q_tvalid(0) = '1' else
+    w_scaled_tready    <= '0' when w_relued_tready = '0' and q_tvalid(1) = '1' else
                           '1';
 
-    w_tready_arr(0)    <= w_scaled_tready;
-    w_tready_arr(1)    <= w_relued_tready;
-    w_tready_arr(2)    <= w_zeroed_tready;
-    w_tready_arr(3)    <= w_saturated_tready;
+    w_data_tready      <= '0' when w_scaled_tready = '0' and q_tvalid(0) = '1' else
+                          '1';
 
-    w_mult_result  <= signed(S_AXIS_TDATA) * signed(q_scale);
+    w_tready_arr(0)    <= w_data_tready;
+    w_tready_arr(1)    <= w_scaled_tready;
+    w_tready_arr(2)    <= w_relued_tready;
+    w_tready_arr(3)    <= w_zeroed_tready;
+    w_tready_arr(4)    <= w_saturated_tready;
 
-    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_scaled_tready = '1' and S_AXIS_TVALID = '1' else
+    w_mult_result  <= q_data * signed(q_scale);
+
+    n_data <= signed(S_AXIS_TDATA) when w_data_tready = '1' and S_AXIS_TVALID = '1' else
+              q_data;
+
+    n_scaled <= w_mult_result((2*C_DATA_WIDTH)-1 downto C_DATA_WIDTH) when w_scaled_tready = '1' and q_tvalid(0) = '1' else
                 q_scaled;
 
     n_relued <= (others => '0') when w_relued_tready = '1' and relu = '1' and q_scaled(C_DATA_WIDTH-1) = '1' else
@@ -141,7 +150,7 @@ begin
     n_tid(0)    <= S_AXIS_TID when w_tready_arr(0) = '1' else
                    q_tid(0);
 
-    GEN_AXIS_CTRL_REGS : for I in 1 to 3 generate
+    GEN_AXIS_CTRL_REGS : for I in 1 to 4 generate
         n_tvalid(I) <= q_tvalid(I-1) when w_tready_arr(I) = '1' else
                        q_tvalid(I);
 

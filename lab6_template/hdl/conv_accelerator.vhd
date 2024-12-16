@@ -24,6 +24,9 @@ entity conv_accelerator is
         MAC_OUTPUT_DATA_WIDTH : integer := 32 -- Data width of the raw output of the MAC unit
     );
     port(
+        clk_slow : in std_logic;
+        reset_busy : out std_logic;
+        reset_slow : in std_logic;
         -- Configuration values from conv_config unit
         max_pooling : in std_logic;
         relu : in std_logic;
@@ -209,7 +212,11 @@ architecture Behavioral of conv_accelerator is
     signal s_dequantization_m_axis_tid : std_logic_vector(1 downto 0);
     signal s_dequantization_m_axis_tvalid : std_logic;
 
+    signal w_reset_busy : std_logic_vector(3 downto 0);
+
 begin
+
+    reset_busy <= w_reset_busy(0) or w_reset_busy(1) or w_reset_busy(2) or w_reset_busy(3);
 
     TEST_s_index_gen_m_axis_tready <= s_index_gen_m_axis_tready;
     TEST_s_index_gen_m_axis_tdata_input_addr <= s_index_gen_m_axis_tdata_input_addr;
@@ -396,7 +403,11 @@ begin
             M_AXIS_TREADY => s_mac0_m_axis_tready,
 
             rst => rst,
-            clk => clk
+            clk_fast => clk,
+            clk_slow => clk_slow,
+            rst_slow => reset_slow,
+
+            reset_busy => w_reset_busy(0)
         );
 
     g_mac1: entity work.conv_mac
@@ -420,7 +431,11 @@ begin
             M_AXIS_TVALID => s_mac1_m_axis_tvalid,
 
             rst => rst,
-            clk => clk
+            clk_fast => clk,
+            clk_slow => clk_slow,
+            rst_slow => reset_slow,
+
+            reset_busy => w_reset_busy(1)
         );
 
     g_mac2: entity work.conv_mac
@@ -444,7 +459,11 @@ begin
             M_AXIS_TVALID => s_mac2_m_axis_tvalid,
 
             rst => rst,
-            clk => clk
+            clk_fast => clk,
+            clk_slow => clk_slow,
+            rst_slow => reset_slow,
+
+            reset_busy => w_reset_busy(2)
         );
 
     g_mac3: entity work.conv_mac
@@ -468,7 +487,11 @@ begin
             M_AXIS_TVALID => s_mac3_m_axis_tvalid,
 
             rst => rst,
-            clk => clk
+            clk_fast => clk,
+            clk_slow => clk_slow,
+            rst_slow => reset_slow,
+
+            reset_busy => w_reset_busy(3)
         );
 
     -- Output to BRAM and mark convolution complete when done

@@ -26,6 +26,10 @@ entity conv_accelerator_wrapper is
         MAC_OUTPUT_DATA_WIDTH : integer := 32 -- Data width of the raw output of the MAC unit
     );
     port(
+        CLK_SLOW : in std_logic;
+        RESET_SLOW : in std_logic;
+        RESET_BUSY : out std_logic;
+
         -- AXI4LITE interface for configuration
         S_AXI_LITE_ACLK : in std_logic;
         S_AXI_LITE_ARESETN : in std_logic;
@@ -167,6 +171,7 @@ architecture Behavioral of conv_accelerator_wrapper is
     signal s_conv_idle : std_logic;
     signal s_reset: std_logic;
     signal s_clk : std_logic;
+    signal s_reset_slow : std_logic;
 
     signal s_max_pooling : std_logic;
     signal s_relu : std_logic;
@@ -190,6 +195,7 @@ architecture Behavioral of conv_accelerator_wrapper is
 begin
 
     s_reset <= not S_AXI_LITE_ARESETN;
+    s_reset_slow <= not RESET_SLOW;
     s_clk <= S_AXI_LITE_ACLK;
 
     -- AXI LITE configuration registers
@@ -271,6 +277,9 @@ begin
         )
         port map(
             -- Configuration values from conv_config unit
+            clk_slow => clk_slow,
+            reset_busy => reset_busy,
+            reset_slow => s_reset_slow,
             relu => s_relu,
             max_pooling => s_max_pooling,
             filter_w => s_filter_w,

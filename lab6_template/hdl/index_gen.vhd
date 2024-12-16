@@ -86,9 +86,9 @@ architecture Behavioral of index_gen is
 
 begin
 
-    ----------------------------------------------------------------------------
-    -- Output Signal Assignments
-    ----------------------------------------------------------------------------
+--     ----------------------------------------------------------------------------
+--     -- Output Signal Assignments
+--     ----------------------------------------------------------------------------
     M_AXIS_TDATA_filter_addr <= std_logic_vector(q_filter_addr);
     M_AXIS_TDATA_input_addr  <= std_logic_vector(q_input_addr);
     -- M_AXIS_TVALID            <= q_tvalid_pipeline(1);
